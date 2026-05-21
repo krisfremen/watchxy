@@ -25,12 +25,14 @@ pub enum Action {
     Resume,
     Quit,
     Refresh,
-    /// Skip the executor’s interval wait so the command runs again as soon as the current run finishes.
+    /// Skip the interval wait and run command(s) now (all commands when multiple, else active only).
     RunCommandNow,
+    /// Skip the interval wait and run only the active command (multi-command mode).
+    RunActiveCommandNow,
     MouseEvent(MouseEvent),
     Error(String),
     Help,
-    StartExecution(ExecutionId, DateTime<Local>),
+    StartExecution(ExecutionId, DateTime<Local>, u32),
     FinishExecution(ExecutionId, DateTime<Local>, Option<(u32, u32)>, i32),
     ShowExecution(ExecutionId, ExecutionId),
     SetClock(DateTime<Local>),
@@ -77,7 +79,7 @@ pub enum Action {
     DiffDetected,
     SetNoTitle(bool),
     SwitchNoTitle,
-    InsertHistory(ExecutionId, DateTime<Local>),
+    InsertHistory(ExecutionId, DateTime<Local>, u32),
     UpdateHistoryResult(ExecutionId, Option<(u32, u32)>, i32),
     UpdateLatestHistoryCount,
     ShowHelp,

@@ -78,13 +78,16 @@ watchxy -n 2s -C "git status" -C "df -h"
 watchxy -n 2s git status -C "df -h"
 ```
 
-Each command keeps its own execution history and diff baseline. Switching only shows the last output for that command; press SPACE to run the active command now, or wait for the next interval.
+Each command keeps its own execution history and diff baseline. On startup, every configured command runs once before the interval loop begins. Switching shows the last output for that command when available.
+
+With multiple commands: **SPACE** runs every command now; **r** runs only the active command. With a single command, **SPACE** runs it now.
 
 ## Keymaps
 
 | key       |                                            |
 |-----------|--------------------------------------------|
-| SPACE     | Run command now (skip wait until next interval) |
+| SPACE     | Run command(s) now (all commands when multiple) |
+| r         | Run active command now (when multiple)        |
 | [ / ]     | Previous / next watched command (when multiple) |
 | m         | Toggle time machine mode                   |
 | s         | Toggle <ins>s</ins>uspend execution                   |

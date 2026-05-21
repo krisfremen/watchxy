@@ -252,10 +252,10 @@ impl Store for SQLiteStore {
 
     fn set_runtime_config(&mut self, config: RuntimeConfig) -> Result<()> {
         if let Ok(conn) = self.conn.lock() {
-            let commands_json = if config.commands.len() > 1 {
-                Some(commands_to_json(&config.commands)?)
-            } else {
+            let commands_json = if config.commands.is_empty() {
                 None
+            } else {
+                Some(commands_to_json(&config.commands)?)
             };
             conn.execute(
                 "INSERT INTO runtime_config (interval, command, commands_json, active_command_index) VALUES (?1, ?2, ?3, ?4)",

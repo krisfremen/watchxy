@@ -79,10 +79,15 @@ impl History {
             .collect()
     }
 
-    fn insert_history(&mut self, id: ExecutionId, start_time: DateTime<Local>) -> Result<()> {
+    fn insert_history(
+        &mut self,
+        id: ExecutionId,
+        start_time: DateTime<Local>,
+        command_index: u32,
+    ) -> Result<()> {
         let item = Rc::new(RefCell::new(HistoryItem::new(
             id,
-            self.runtime_config.active_command_index as u32,
+            command_index,
             start_time,
             self.runtime_config.interval,
             self.config.get_style("timemachine_selector"),
@@ -245,7 +250,9 @@ impl Component for History {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::InsertHistory(id, start_time) => self.insert_history(id, start_time)?,
+            Action::InsertHistory(id, start_time, command_index) => {
+                self.insert_history(id, start_time, command_index)?
+            }
             Action::UpdateHistoryResult(id, diff, exit_code) => {
                 self.update_history_result(id, diff, exit_code)?
             }
@@ -262,7 +269,9 @@ impl Component for History {
             Action::MouseEvent(e) => self.handle_mouse_events(e)?,
             Action::SetActiveCommandIndex(index) => {
                 self.runtime_config.set_active_command_index(index);
-                self.select_latest()?;
+                if self.timemachine_mode {
+                    self.select_latest()?;
+                }
             }
             _ => {}
         }
@@ -288,5 +297,47 @@ impl Component for History {
         f.render_stateful_widget(list, area, &mut self.state);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Local;
+
+    use crate::{
+        config::RuntimeConfig,
+        types::ExecutionId,
+    };
+
+    use super::History;
+
+    #[test]
+    fn insert_history_tags_passed_command_index() {
+        let runtime_config =
+            RuntimeConfig::from_single_command(chrono::Duration::seconds(2), vec!["true".into()]);
+        let mut history = History::new(runtime_config);
+        let id = ExecutionId(1);
+        history
+            .insert_history(id, Local::now(), 2)
+            .expect("insert");
+        assert_eq!(history.items[0].borrow().command_index, 2);
+    }
+
+    #[test]
+    fn visible_items_only_shows_active_command() {
+        let runtime_config = RuntimeConfig::from_commands(
+            chrono::Duration::seconds(2),
+            vec![vec!["a".into()], vec!["b".into()]],
+        );
+        let mut history = History::new(runtime_config);
+        history
+            .insert_history(ExecutionId(1), Local::now(), 0)
+            .expect("insert");
+        history
+            .insert_history(ExecutionId(2), Local::now(), 1)
+            .expect("insert");
+        history.runtime_config.set_active_command_index(1);
+        assert_eq!(history.visible_items().len(), 1);
+        assert_eq!(history.visible_items()[0].borrow().command_index, 1);
     }
 }

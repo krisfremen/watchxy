@@ -6,6 +6,7 @@ pub mod action;
 pub mod app;
 mod bytes;
 pub mod cli;
+pub mod command_state;
 pub mod components;
 pub mod config;
 mod diff;

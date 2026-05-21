@@ -43,7 +43,16 @@ impl RuntimeConfig {
     }
 
     pub fn active_command(&self) -> &[String] {
-        &self.commands[self.active_command_index]
+        static EMPTY: &[String] = &[];
+        if let Some(cmd) = self.commands.get(self.active_command_index) {
+            if !cmd.is_empty() {
+                return cmd;
+            }
+        }
+        self.commands
+            .first()
+            .map(|c| c.as_slice())
+            .unwrap_or(EMPTY)
     }
 
     pub fn active_command_display(&self) -> String {

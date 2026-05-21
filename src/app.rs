@@ -15,6 +15,7 @@ use tracing_subscriber::field::debug;
 
 use crate::{
     action::{self, Action, DiffMode},
+    command_state::COMMAND_PRODUCED_NO_OUTPUT,
     bytes::normalize_stdout,
     cli::Cli,
     components::{fps::FpsCounter, home::Home, Component},
@@ -22,6 +23,7 @@ use crate::{
     diff::{diff_and_mark, diff_and_mark_delete},
     mode::Mode,
     old_config::OldConfig,
+    command_state::WakeRequest,
     runner::{run_executor, run_executor_precise},
     search::search_and_mark,
     store::{
@@ -55,8 +57,8 @@ pub struct App<S: Store> {
     store: S,
     read_only: bool,
     disable_mouse: bool,
-    wake_tx: mpsc::Sender<()>,
-    wake_rx: Option<mpsc::Receiver<()>>,
+    wake_tx: mpsc::Sender<WakeRequest>,
+    wake_rx: Option<mpsc::Receiver<WakeRequest>>,
 }
 
 fn build_runtime_config_from_cli(cli: &Cli) -> RuntimeConfig {
@@ -104,16 +106,17 @@ impl<S: Store> App<S> {
         self.runtime_config.set_active_command_index(index);
         self.store
             .set_runtime_config(store_runtime_from_app(&self.runtime_config))?;
-        action_tx.send(Action::SetActiveCommandIndex(index))?;
         if let Some(id) = self
             .store
             .get_latest_id_for_command(index as u32)?
         {
-            action_tx.send(Action::ShowExecution(id, id))?;
-        } else {
-            action_tx.send(Action::SetResult(None))?;
-            self.showing_execution_id = None;
+            if let Some(record) = self.store.get_record(id)? {
+                if record.command_index == index as u32 {
+                    action_tx.send(Action::ShowExecution(id, id))?;
+                }
+            }
         }
+        action_tx.send(Action::SetActiveCommandIndex(index))?;
         Ok(())
     }
 
@@ -163,7 +166,7 @@ impl<S: Store> App<S> {
         };
 
         let timemachine_mode = false;
-        let (wake_tx, wake_rx) = mpsc::channel(1);
+        let (wake_tx, wake_rx) = mpsc::channel(16);
         let home = Home::new(
             config.clone(),
             runtime_config.clone(),
@@ -221,7 +224,7 @@ impl<S: Store> App<S> {
 
         let records = self.store.get_records()?;
         for r in records {
-            action_tx.send(Action::StartExecution(r.id, r.start_time))?;
+            action_tx.send(Action::StartExecution(r.id, r.start_time, r.command_index))?;
             action_tx.send(Action::FinishExecution(
                 r.id,
                 r.end_time,
@@ -407,19 +410,37 @@ impl<S: Store> App<S> {
                                 if diff_add == 0 && diff_delete == 0 {
                                     action_tx.send(Action::UpdateLatestHistoryCount)?;
                                 } else {
-                                    action_tx.send(Action::InsertHistory(id, start_time))?;
+                                    let command_index = self
+                                        .store
+                                        .get_record(id)?
+                                        .map(|r| r.command_index)
+                                        .unwrap_or(self.runtime_config.active_command_index as u32);
+                                    action_tx.send(Action::InsertHistory(
+                                        id,
+                                        start_time,
+                                        command_index,
+                                    ))?;
                                     action_tx
                                         .send(Action::UpdateHistoryResult(id, diff, exit_code))?;
                                 }
                             } else {
-                                action_tx.send(Action::InsertHistory(id, start_time))?;
+                                let command_index = self
+                                    .store
+                                    .get_record(id)?
+                                    .map(|r| r.command_index)
+                                    .unwrap_or(self.runtime_config.active_command_index as u32);
+                                action_tx.send(Action::InsertHistory(
+                                    id,
+                                    start_time,
+                                    command_index,
+                                ))?;
                                 action_tx.send(Action::UpdateHistoryResult(id, diff, exit_code))?;
                             }
                         } else {
                             action_tx.send(Action::UpdateHistoryResult(id, diff, exit_code))?;
                         }
 
-                        if !self.timemachine_mode && !self.read_only {
+                        if !self.timemachine_mode {
                             if let Some(record) = self.store.get_record(id)? {
                                 if record.command_index
                                     == self.runtime_config.active_command_index as u32
@@ -429,21 +450,28 @@ impl<S: Store> App<S> {
                             }
                         }
                     }
-                    Action::StartExecution(id, start_time) if !self.is_skip_empty_diffs => {
-                        action_tx.send(Action::InsertHistory(id, start_time))?;
+                    Action::StartExecution(id, start_time, command_index)
+                        if !self.is_skip_empty_diffs =>
+                    {
+                        action_tx.send(Action::InsertHistory(id, start_time, command_index))?;
                     }
-                    Action::StartExecution(_, _) => {}
+                    Action::StartExecution(_, _, _) => {}
                     Action::ShowExecution(id, end_id) => {
                         let style =
                             termtext::convert_to_anstyle(self.config.get_style("background"));
                         let record = self.store.get_record(id)?;
                         let mut string = "".to_string();
                         if let Some(record) = record {
+                            let show = self.timemachine_mode
+                                || record.command_index
+                                    == self.runtime_config.active_command_index as u32;
+                            if show {
                             action_tx.send(Action::SetClock(record.start_time))?;
-                            let mut result = termtext::Converter::new(style)
-                                .convert(&normalize_stdout(&record.stdout));
-                            if record.stdout.is_empty() {
-                                result = termtext::Converter::new(style)
+                            let mut result = if record.stdout.is_empty() && record.stderr.is_empty() {
+                                termtext::Converter::new(style)
+                                    .convert(COMMAND_PRODUCED_NO_OUTPUT.as_bytes())
+                            } else if record.stdout.is_empty() {
+                                let mut result = termtext::Converter::new(style)
                                     .convert(&normalize_stdout(&record.stderr));
                                 result.mark_text(
                                     0,
@@ -451,7 +479,12 @@ impl<S: Store> App<S> {
                                     Style::new()
                                         .fg_color(Some(Color::Ansi(anstyle::AnsiColor::Red))),
                                 );
+                                result
                             } else {
+                                termtext::Converter::new(style)
+                                    .convert(&normalize_stdout(&record.stdout))
+                            };
+                            if !record.stdout.is_empty() {
                                 string = result.plain_text();
                                 if let Some(diff_mode) = self.diff_mode {
                                     if let Some(previous_id) = record.previous_id {
@@ -494,6 +527,13 @@ impl<S: Store> App<S> {
                             }
                             action_tx.send(Action::SetResult(Some(result)))?;
                             self.showing_execution_id = Some(id);
+                            }
+                        } else {
+                            log::warn!("ShowExecution: record {id:?} not found in store");
+                            let text = termtext::Converter::new(style)
+                                .convert(COMMAND_PRODUCED_NO_OUTPUT.as_bytes());
+                            action_tx.send(Action::SetResult(Some(text)))?;
+                            self.showing_execution_id = None;
                         }
                     }
                     Action::SwitchTimemachineMode => {
@@ -582,9 +622,17 @@ impl<S: Store> App<S> {
                         self.set_mode(mode);
                     }
                     Action::RunCommandNow if !self.read_only => {
-                        let _ = self.wake_tx.try_send(());
+                        let request = if self.runtime_config.command_count() > 1 {
+                            WakeRequest::All
+                        } else {
+                            WakeRequest::Active
+                        };
+                        let _ = self.wake_tx.try_send(request);
                     }
-                    Action::RunCommandNow => {}
+                    Action::RunActiveCommandNow if !self.read_only => {
+                        let _ = self.wake_tx.try_send(WakeRequest::Active);
+                    }
+                    Action::RunCommandNow | Action::RunActiveCommandNow => {}
                     _ => {}
                 }
                 for component in self.components.iter_mut() {

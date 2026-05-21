@@ -163,9 +163,14 @@ impl Component for Help {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let basic_keys = [
             (
-                "Run command now           ",
+                "Run command(s) now        ",
                 Mode::All,
                 Action::RunCommandNow.to_string(),
+            ),
+            (
+                "Run active command now    ",
+                Mode::All,
+                Action::RunActiveCommandNow.to_string(),
             ),
             (
                 "Next watched command      ",

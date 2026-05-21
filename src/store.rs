@@ -54,11 +54,8 @@ impl RuntimeConfig {
         }
     }
 
-    pub fn active_command_tokens(&self) -> &[String] {
-        self.commands
-            .get(self.active_command_index as usize)
-            .map(|c| c.as_slice())
-            .unwrap_or(&[])
+    pub fn active_command_tokens(&self) -> Vec<String> {
+        crate::command_state::resolved_active_command_tokens(self)
     }
 }
 
