@@ -58,7 +58,7 @@ impl OldConfig {
 
     pub fn new() -> Result<Self> {
         let config_dir = utils::get_old_config_dir();
-        let file_path = config_dir.join("viddy.toml");
+        let file_path = config_dir.join("watchxy.toml");
         let config_str = std::fs::read_to_string(file_path)?;
         let config = OldConfig::new_from_str(&config_str)?;
         Ok(config)

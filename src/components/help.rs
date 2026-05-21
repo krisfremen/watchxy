@@ -203,7 +203,7 @@ impl Component for Help {
                 Action::SwitchFold.to_string(),
             ),
             (
-                "Quit Viddy                ",
+                "Quit WatchXY              ",
                 Mode::All,
                 Action::Quit.to_string(),
             ),

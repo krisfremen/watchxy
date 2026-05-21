@@ -35,7 +35,7 @@ pub static LOG_ENV: LazyLock<String> = LazyLock::new(|| format!("{}_LOGLEVEL", *
 pub const LOG_FILE: &str = concat!(env!("CARGO_PKG_NAME"), ".log");
 
 pub static PROJECT_DIRECTORY: LazyLock<Option<ProjectDirs>> =
-    LazyLock::new(|| ProjectDirs::from("dev", "sachaos", env!("CARGO_PKG_NAME")));
+    LazyLock::new(|| ProjectDirs::from("dev", "krisfremen", env!("CARGO_PKG_NAME")));
 
 pub fn initialize_panic_handler() -> Result<()> {
     let (panic_hook, eyre_hook) = color_eyre::config::HookBuilder::default()

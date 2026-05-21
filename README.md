@@ -1,17 +1,17 @@
-# Viddy
+# WatchXY
 
 <p align="center">
-<img src="images/logo.png" width="200" alt="viddy" title="viddy" />
+<img src="images/logo.png" width="200" alt="watchxy" title="watchxy" />
 </p>
 
 Modern `watch` command.
 
-Viddy well, gopher. Viddy well.
+**WatchXY** is a terminal UI that runs a command on an interval, highlights diffs, and adds a time-machine style history. It started from open-source work by [Takumasa Sakao](https://github.com/sachaos); this tree uses the **watchxy** binary and crate name throughout.
 
 ## Demo
 
 <p align="center">
-<img src="images/demo.gif" width="100%" alt="viddy" title="viddy" />
+<img src="images/demo.gif" width="100%" alt="watchxy" title="watchxy" />
 </p>
 
 ## Features
@@ -29,77 +29,45 @@ Viddy well, gopher. Viddy well.
 * Vim like keymaps.
 * Search text.
 * Suspend and restart execution.
-* Support shell alias
-    * See detail https://github.com/sachaos/viddy/issues/2#issuecomment-904002053
+* Support shell alias (behavior depends on shell; you may need login shells or full profile initialization for aliases defined only in interactive configs).
 * Customize keymappings.
 * Customize color.
 
 ## Install
 
-### Cargo
+The installed binary is **`watchxy`**.
+
+### From this repository
 
 ```shell
-cargo install viddy
+cargo install --path .
+```
+
+### crates.io
+
+```shell
+cargo install watchxy
 ```
 
 ### [Homebrew](https://brew.sh)
 
 ```shell
-brew install viddy
+brew install watchxy
 ```
 
-### Linux
+### Linux (release tarball)
+
+Adjust `OWNER`, `REPO`, version, and asset name to match your published release:
 
 ```shell
-wget -O viddy.tar.gz https://github.com/sachaos/viddy/releases/download/v1.3.0/viddy-v1.3.0-linux-x86_64.tar.gz && tar xvf viddy.tar.gz && mv viddy /usr/local/bin
+wget -O watchxy.tar.gz https://github.com/OWNER/REPO/releases/download/v1.3.0/watchxy-v1.3.0-linux-x86_64.tar.gz \
+  && tar xvf watchxy.tar.gz \
+  && mv watchxy /usr/local/bin
 ```
 
-### Other
+### Other package managers
 
-Download from [release page](https://github.com/sachaos/viddy/releases).
-
-## Install with Other Package Managers (Community-Maintained)
-
-### [MacPorts](https://www.macports.org)
-
-```shell
-sudo port install viddy
-```
-
-### [Scoop](https://scoop.sh/)
-
-To install Viddy on Windows, first install the Scoop package manager, and then run the commands below.
-
-**NOTE**: The git package is required in order to add additional Scoop "buckets".
-
-```
-scoop install git
-scoop bucket add extras
-scoop install extras/viddy
-```
-
-### ArchLinux ( AUR )
-
-```shell
-yay -S viddy
-```
-Alternatively you can use the [AUR Git repo](https://aur.archlinux.org/packages/viddy/) directly
-
-### Alpine Linux
-
-After [enabling the community repository](https://wiki.alpinelinux.org/wiki/Enable_Community_Repository):
-
-```shell
-apk add viddy
-```
-
-### [asdf version manager](https://asdf-vm.com)
-
-```shell
-asdf plugin add viddy
-asdf install viddy latest
-asdf global viddy latest
-```
+Community formulas use their own names; search for **watchxy** once a maintainer publishes one.
 
 ## Keymaps
 
@@ -129,11 +97,13 @@ asdf global viddy latest
 
 ## Configuration
 
-Viddy can be used without any configuration.
+WatchXY can be used without any configuration.
 However, if you want to customize the keybindings or default behavior, you can do so.
 
-Install your config file on `$XDG_CONFIG_HOME/viddy.toml`
-On macOS, the path is `~/Library/Application\ Support/viddy.toml`.
+**WatchXY** loads settings in two ways:
+
+1. **Default (recommended):** `config.json5` / `config.toml` / other supported names under the app config directory from XDG / `directories`. Run `watchxy --version` to print **Config directory** and **Data directory** on your machine.
+2. **Legacy TOML:** if `$XDG_CONFIG_HOME/watchxy.toml` exists, it is used instead of the JSON-first stack (macOS: `~/Library/Application Support/watchxy.toml`).
 
 ```toml
 [general]
@@ -165,13 +135,12 @@ scroll_top_of_page = "g g"
 background = "white" # Default value is inherit from terminal color.
 ```
 
-## What is "viddy" ?
+## Name and runtime
 
-"viddy" is Nadsat word meaning to see.
-Nadsat is fictional argot of gangs in the violent book and movie "A Clockwork Orange".
+**WatchXY** is the product name. The binary and crate are **`watchxy`**. Logs and env overrides use that name (for example `watchxy.log`, and `WATCHXY_CONFIG` / `WATCHXY_DATA` / `WATCHXY_LOGLEVEL`).
 
 ## Credits
 
-The gopher's logo of viddy is licensed under the Creative Commons 3.0 Attributions license.
+The gopher's logo is licensed under the Creative Commons 3.0 Attributions license.
 
 The original Go gopher was designed by [Renee French](https://reneefrench.blogspot.com/).
