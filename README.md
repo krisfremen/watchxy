@@ -78,7 +78,7 @@ watchxy -n 2s -C "git status" -C "df -h"
 watchxy -n 2s git status -C "df -h"
 ```
 
-Each command keeps its own execution history and diff baseline. Switching runs the newly selected command on the next interval (or immediately if you press SPACE).
+Each command keeps its own execution history and diff baseline. Switching only shows the last output for that command; press SPACE to run the active command now, or wait for the next interval.
 
 ## Keymaps
 

@@ -114,7 +114,6 @@ impl<S: Store> App<S> {
             action_tx.send(Action::SetResult(None))?;
             self.showing_execution_id = None;
         }
-        let _ = self.wake_tx.try_send(());
         Ok(())
     }
 
