@@ -163,6 +163,11 @@ impl Component for Help {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let basic_keys = [
             (
+                "Run command now           ",
+                Mode::All,
+                Action::RunCommandNow.to_string(),
+            ),
+            (
                 "Toggle time machine mode  ",
                 Mode::All,
                 Action::SwitchTimemachineMode.to_string(),

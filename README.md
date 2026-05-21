@@ -73,7 +73,8 @@ Community formulas use their own names; search for **watchxy** once a maintainer
 
 | key       |                                            |
 |-----------|--------------------------------------------|
-| SPACE     | Toggle time machine mode                   |
+| SPACE     | Run command now (skip wait until next interval) |
+| m         | Toggle time machine mode                   |
 | s         | Toggle <ins>s</ins>uspend execution                   |
 | b         | Toggle ring terminal <ins>b</ins>ell                  |
 | d         | Toggle <ins>d</ins>iff                                |

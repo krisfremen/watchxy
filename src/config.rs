@@ -644,6 +644,23 @@ mod tests {
     }
 
     #[test]
+    fn test_default_run_command_now_keybinding() -> Result<()> {
+        let c = Config::new()?;
+        let all = c.keybindings.get(&Mode::All).unwrap();
+        assert_eq!(
+            all.get(&parse_key_sequence("<space>").unwrap_or_default())
+                .unwrap(),
+            &Action::RunCommandNow
+        );
+        assert_eq!(
+            all.get(&parse_key_sequence("<m>").unwrap_or_default())
+                .unwrap(),
+            &Action::SwitchTimemachineMode
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_simple_keys() {
         assert_eq!(
             parse_key_event("a").unwrap(),

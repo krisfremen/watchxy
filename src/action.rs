@@ -25,6 +25,8 @@ pub enum Action {
     Resume,
     Quit,
     Refresh,
+    /// Skip the executor’s interval wait so the command runs again as soon as the current run finishes.
+    RunCommandNow,
     MouseEvent(MouseEvent),
     Error(String),
     Help,
