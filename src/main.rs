@@ -72,7 +72,8 @@ async fn tokio_main() -> Result<()> {
 
         println!("Backup saved at {}", file_path.to_str().unwrap());
         println!(
-            "Run `viddy --lookback {}` to load backup",
+            "Run `{} --lookback {}` to load backup",
+            env!("CARGO_PKG_NAME"),
             file_path.to_str().unwrap()
         );
     }

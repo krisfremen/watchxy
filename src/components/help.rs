@@ -27,7 +27,7 @@ fn keys_str(
     keybindings: &HashMap<(Mode, String), Vec<Vec<KeyEvent>>>,
     mode: Mode,
     action: String,
-) -> Vec<Span> {
+) -> Vec<Span<'_>> {
     keybindings.get(&(mode, action.clone())).map_or_else(
         || vec![Span::from("None")],
         |keys_list| {
@@ -203,7 +203,7 @@ impl Component for Help {
                 Action::SwitchFold.to_string(),
             ),
             (
-                "Quit Viddy                ",
+                "Quit WatchXY              ",
                 Mode::All,
                 Action::Quit.to_string(),
             ),
