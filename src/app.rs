@@ -355,11 +355,10 @@ impl<S: Store> App<S> {
                             action_tx.send(Action::ShowExecution(id, id))?;
                         }
                     }
-                    Action::StartExecution(id, start_time) => {
-                        if !self.is_skip_empty_diffs {
-                            action_tx.send(Action::InsertHistory(id, start_time))?;
-                        }
+                    Action::StartExecution(id, start_time) if !self.is_skip_empty_diffs => {
+                        action_tx.send(Action::InsertHistory(id, start_time))?;
                     }
+                    Action::StartExecution(_, _) => {}
                     Action::ShowExecution(id, end_id) => {
                         let style =
                             termtext::convert_to_anstyle(self.config.get_style("background"));
@@ -487,11 +486,10 @@ impl<S: Store> App<S> {
                         let mut is_suspend = self.is_suspend.lock().await;
                         *is_suspend = new_is_suspend;
                     }
-                    Action::DiffDetected => {
-                        if self.is_bell {
-                            print!("\x07");
-                        }
+                    Action::DiffDetected if self.is_bell => {
+                        print!("\x07");
                     }
+                    Action::DiffDetected => {}
                     Action::SwitchNoTitle => {
                         action_tx.send(Action::SetNoTitle(!self.is_no_title))?;
                     }
