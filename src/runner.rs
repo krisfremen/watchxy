@@ -212,11 +212,7 @@ mod test {
     use tokio::time::sleep;
 
     use super::{count_diff, run_executor, wait_interval_or_wake};
-    use crate::{
-        action::Action,
-        config::RuntimeConfig,
-        store::memory::MemoryStore,
-    };
+    use crate::{action::Action, config::RuntimeConfig, store::memory::MemoryStore};
 
     #[tokio::test]
     async fn wait_interval_or_wake_returns_early_on_wake() {
