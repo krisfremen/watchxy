@@ -130,6 +130,9 @@ impl Component for Home {
                 self.interval_component.decrease_interval();
             }
             Action::SetNoTitle(is_no_title) => self.is_no_title = is_no_title,
+            Action::SetActiveCommandIndex(index) => {
+                self.runtime_config.set_active_command_index(index);
+            }
             _ => {}
         }
 

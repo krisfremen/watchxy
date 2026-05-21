@@ -24,7 +24,9 @@ use crate::{
     old_config::OldConfig,
     runner::{run_executor, run_executor_precise},
     search::search_and_mark,
-    store::{self, RuntimeConfig as StoreRuntimeConfig, Store},
+    store::{
+        self, parse_command_tokens, RuntimeConfig as StoreRuntimeConfig, Store,
+    },
     termtext, tui,
     types::ExecutionId,
 };
@@ -57,32 +59,72 @@ pub struct App<S: Store> {
     wake_rx: Option<mpsc::Receiver<()>>,
 }
 
+fn build_runtime_config_from_cli(cli: &Cli) -> RuntimeConfig {
+    let mut commands: Vec<Vec<String>> = Vec::new();
+    if !cli.command.is_empty() {
+        commands.push(cli.command.clone());
+    }
+    for cmd in &cli.commands {
+        commands.push(parse_command_tokens(cmd));
+    }
+    RuntimeConfig::from_commands(cli.interval, commands)
+}
+
+fn store_runtime_from_app(runtime_config: &RuntimeConfig) -> StoreRuntimeConfig {
+    StoreRuntimeConfig {
+        interval: runtime_config.interval.num_milliseconds() as u64,
+        command: runtime_config.active_command_display(),
+        commands: runtime_config.commands.clone(),
+        active_command_index: runtime_config.active_command_index as u32,
+    }
+}
+
+fn runtime_config_from_store(store_config: StoreRuntimeConfig) -> RuntimeConfig {
+    let commands = if store_config.commands.is_empty() {
+        vec![parse_command_tokens(&store_config.command)]
+    } else {
+        store_config.commands
+    };
+    RuntimeConfig {
+        interval: Duration::milliseconds(store_config.interval as i64),
+        commands,
+        active_command_index: store_config.active_command_index as usize,
+    }
+}
+
 impl<S: Store> App<S> {
+    fn activate_command(
+        &mut self,
+        index: usize,
+        action_tx: &mpsc::UnboundedSender<Action>,
+    ) -> Result<()> {
+        if self.runtime_config.command_count() <= 1 {
+            return Ok(());
+        }
+        self.runtime_config.set_active_command_index(index);
+        self.store
+            .set_runtime_config(store_runtime_from_app(&self.runtime_config))?;
+        action_tx.send(Action::SetActiveCommandIndex(index))?;
+        if let Some(id) = self
+            .store
+            .get_latest_id_for_command(index as u32)?
+        {
+            action_tx.send(Action::ShowExecution(id, id))?;
+        } else {
+            action_tx.send(Action::SetResult(None))?;
+            self.showing_execution_id = None;
+        }
+        let _ = self.wake_tx.try_send(());
+        Ok(())
+    }
+
     pub fn new(cli: Cli, mut store: S, read_only: bool) -> Result<Self> {
         let runtime_config = if read_only {
             let store_runtime_config = store.get_runtime_config()?.unwrap_or_default();
-
-            RuntimeConfig {
-                interval: Duration::milliseconds(store_runtime_config.interval as i64),
-                command: store_runtime_config
-                    .command
-                    .split(' ')
-                    .map(|s| s.to_string())
-                    .collect(),
-            }
+            runtime_config_from_store(store_runtime_config)
         } else {
-            let runtime_config = RuntimeConfig {
-                interval: cli.interval,
-                command: cli.command.clone(),
-            };
-
-            let interval = cli.interval.to_std().unwrap_or_default();
-            let command = cli.command.join(" ");
-            store.set_runtime_config(StoreRuntimeConfig {
-                interval: interval.as_millis() as u64,
-                command,
-            })?;
-
+            let runtime_config = build_runtime_config_from_cli(&cli);
+            store.set_runtime_config(store_runtime_from_app(&runtime_config))?;
             runtime_config
         };
 
@@ -300,10 +342,9 @@ impl<S: Store> App<S> {
                         self.runtime_config.interval +=
                             Duration::milliseconds(self.config.general.interval_step_ms);
 
-                        self.store.set_runtime_config(StoreRuntimeConfig {
-                            interval: self.runtime_config.interval.num_milliseconds() as u64,
-                            command: self.runtime_config.command.join(" "),
-                        })?;
+                        self.store.set_runtime_config(store_runtime_from_app(
+                            &self.runtime_config,
+                        ))?;
                     }
                     Action::DecreaseInterval => {
                         let min_interval =
@@ -314,11 +355,26 @@ impl<S: Store> App<S> {
 
                         self.runtime_config.interval = new_interval;
 
-                        self.store.set_runtime_config(StoreRuntimeConfig {
-                            interval: new_interval.num_milliseconds() as u64,
-                            command: self.runtime_config.command.join(" "),
-                        })?;
+                        self.store.set_runtime_config(store_runtime_from_app(
+                            &self.runtime_config,
+                        ))?;
                     }
+                    Action::NextCommand
+                        if !self.read_only && self.runtime_config.command_count() > 1 =>
+                    {
+                        let index = self.runtime_config.next_command_index();
+                        self.activate_command(index, &action_tx)?;
+                    }
+                    Action::PrevCommand
+                        if !self.read_only && self.runtime_config.command_count() > 1 =>
+                    {
+                        let index = self.runtime_config.prev_command_index();
+                        self.activate_command(index, &action_tx)?;
+                    }
+                    Action::SetActiveCommandIndex(index) => {
+                        self.runtime_config.set_active_command_index(index);
+                    }
+                    Action::NextCommand | Action::PrevCommand => {}
                     Action::Suspend => self.should_suspend = true,
                     Action::Resume => self.should_suspend = false,
                     Action::Resize(w, h) => {
@@ -365,7 +421,13 @@ impl<S: Store> App<S> {
                         }
 
                         if !self.timemachine_mode && !self.read_only {
-                            action_tx.send(Action::ShowExecution(id, id))?;
+                            if let Some(record) = self.store.get_record(id)? {
+                                if record.command_index
+                                    == self.runtime_config.active_command_index as u32
+                                {
+                                    action_tx.send(Action::ShowExecution(id, id))?;
+                                }
+                            }
                         }
                     }
                     Action::StartExecution(id, start_time) if !self.is_skip_empty_diffs => {
@@ -440,7 +502,9 @@ impl<S: Store> App<S> {
                     }
                     Action::SetTimemachineMode(timemachine_mode) => {
                         self.timemachine_mode = timemachine_mode;
-                        if let Some(latest_id) = self.store.get_latest_id()? {
+                        if let Some(latest_id) = self.store.get_latest_id_for_command(
+                            self.runtime_config.active_command_index as u32,
+                        )? {
                             action_tx.send(Action::ShowExecution(latest_id, latest_id))?;
                         }
                     }

@@ -41,6 +41,8 @@
       "<?>": "ShowHelp",
       "<+>": "IncreaseInterval",
       "<->": "DecreaseInterval",
+      "<]>": "NextCommand",
+      "<[>": "PrevCommand",
     },
     "Search": {
       "<Ctrl-d>": "Quit", // Another way to quit

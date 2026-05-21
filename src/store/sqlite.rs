@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::store::{Record, Store};
+use crate::store::{
+    commands_from_json, commands_to_json, parse_command_tokens, Record, RuntimeConfig, Store,
+};
 use crate::types::ExecutionId;
 use crate::widget::history_item::HistoryItem;
 
@@ -36,7 +38,8 @@ impl SQLiteStore {
                 exit_code INTEGER NOT NULL,
                 diff_add INTEGER,
                 diff_delete INTEGER,
-                previous_id INTEGER
+                previous_id INTEGER,
+                command_index INTEGER NOT NULL DEFAULT 0
             )",
                 (),
             )?;
@@ -44,10 +47,14 @@ impl SQLiteStore {
             conn.execute(
                 "CREATE TABLE runtime_config (
                 interval INTEGER NOT NULL,
-                command TEXT NOT NULL
+                command TEXT NOT NULL,
+                commands_json TEXT,
+                active_command_index INTEGER NOT NULL DEFAULT 0
             )",
                 (),
             )?;
+        } else {
+            migrate_schema(&conn)?;
         }
 
         Ok(Self {
@@ -56,13 +63,41 @@ impl SQLiteStore {
     }
 }
 
+fn migrate_schema(conn: &Connection) -> Result<()> {
+    let record_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(record)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if !record_columns.iter().any(|c| c == "command_index") {
+        conn.execute(
+            "ALTER TABLE record ADD COLUMN command_index INTEGER NOT NULL DEFAULT 0",
+            (),
+        )?;
+    }
+
+    let config_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(runtime_config)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if !config_columns.iter().any(|c| c == "commands_json") {
+        conn.execute("ALTER TABLE runtime_config ADD COLUMN commands_json TEXT", ())?;
+    }
+    if !config_columns.iter().any(|c| c == "active_command_index") {
+        conn.execute(
+            "ALTER TABLE runtime_config ADD COLUMN active_command_index INTEGER NOT NULL DEFAULT 0",
+            (),
+        )?;
+    }
+    Ok(())
+}
+
 impl Store for SQLiteStore {
     fn add_record(&mut self, record: Record) -> Result<()> {
         if let Ok(conn) = self.conn.lock() {
             conn.execute(
                 "INSERT INTO record (
-                id, start_time, stdout, stderr, end_time, exit_code, diff_add, diff_delete, previous_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                id, start_time, stdout, stderr, end_time, exit_code, diff_add, diff_delete, previous_id, command_index
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 (
                     record.id,
                     record.start_time.to_utc().to_rfc3339(),
@@ -73,6 +108,7 @@ impl Store for SQLiteStore {
                     record.diff.map(|(add, delete)| add as i64),
                     record.diff.map(|(add, delete)| delete as i64),
                     record.previous_id,
+                    record.command_index,
                 ),
             )?;
             Ok(())
@@ -98,6 +134,7 @@ impl Store for SQLiteStore {
                     exit_code: row.get(5)?,
                     diff,
                     previous_id: row.get(8)?,
+                    command_index: row.get::<_, u32>(9).unwrap_or(0),
                 })
             });
 
@@ -116,6 +153,24 @@ impl Store for SQLiteStore {
             let r = conn.query_row(
                 "SELECT id FROM record ORDER BY id DESC LIMIT 1",
                 [],
+                |row| row.get(0),
+            );
+
+            match r {
+                Ok(id) => Ok(Some(id)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            color_eyre::eyre::bail!("Failed to get connection")
+        }
+    }
+
+    fn get_latest_id_for_command(&self, command_index: u32) -> Result<Option<ExecutionId>> {
+        if let Ok(conn) = self.conn.lock() {
+            let r = conn.query_row(
+                "SELECT id FROM record WHERE command_index = ?1 ORDER BY id DESC LIMIT 1",
+                [command_index],
                 |row| row.get(0),
             );
 
@@ -148,6 +203,7 @@ impl Store for SQLiteStore {
                         exit_code: row.get(5)?,
                         diff,
                         previous_id: row.get(8)?,
+                        command_index: row.get::<_, u32>(9).unwrap_or(0),
                     })
                 })?
                 .collect::<rusqlite::Result<Vec<Record>>>()?;
@@ -157,21 +213,35 @@ impl Store for SQLiteStore {
         }
     }
 
-    fn get_runtime_config(&self) -> Result<Option<crate::store::RuntimeConfig>> {
+    fn get_runtime_config(&self) -> Result<Option<RuntimeConfig>> {
         if let Ok(conn) = self.conn.lock() {
             let r = conn.query_row(
-                "SELECT * FROM runtime_config ORDER BY ROWID DESC LIMIT 1",
+                "SELECT interval, command, commands_json, active_command_index FROM runtime_config ORDER BY ROWID DESC LIMIT 1",
                 [],
                 |row| {
-                    Ok(crate::store::RuntimeConfig {
-                        interval: row.get(0)?,
-                        command: row.get(1)?,
-                    })
+                    Ok((
+                        row.get::<_, u64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, u32>(3).unwrap_or(0),
+                    ))
                 },
             );
 
             match r {
-                Ok(config) => Ok(Some(config)),
+                Ok((interval, command, commands_json, active_command_index)) => {
+                    let commands = if let Some(json) = commands_json {
+                        commands_from_json(&json)?
+                    } else {
+                        vec![parse_command_tokens(&command)]
+                    };
+                    Ok(Some(RuntimeConfig {
+                        interval,
+                        command,
+                        commands,
+                        active_command_index,
+                    }))
+                }
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
                 Err(e) => Err(e.into()),
             }
@@ -180,11 +250,21 @@ impl Store for SQLiteStore {
         }
     }
 
-    fn set_runtime_config(&mut self, config: crate::store::RuntimeConfig) -> Result<()> {
+    fn set_runtime_config(&mut self, config: RuntimeConfig) -> Result<()> {
         if let Ok(conn) = self.conn.lock() {
+            let commands_json = if config.commands.len() > 1 {
+                Some(commands_to_json(&config.commands)?)
+            } else {
+                None
+            };
             conn.execute(
-                "INSERT INTO runtime_config (interval, command) VALUES (?1, ?2)",
-                (config.interval, config.command),
+                "INSERT INTO runtime_config (interval, command, commands_json, active_command_index) VALUES (?1, ?2, ?3, ?4)",
+                (
+                    config.interval,
+                    config.command,
+                    commands_json,
+                    config.active_command_index,
+                ),
             )?;
             Ok(())
         } else {

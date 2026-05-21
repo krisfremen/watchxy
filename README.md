@@ -69,11 +69,23 @@ wget -O watchxy.tar.gz https://github.com/OWNER/REPO/releases/download/v1.3.0/wa
 
 Community formulas use their own names; search for **watchxy** once a maintainer publishes one.
 
+## Multiple commands
+
+Run more than one command and switch between them with `[` and `]`:
+
+```shell
+watchxy -n 2s -C "git status" -C "df -h"
+watchxy -n 2s git status -C "df -h"
+```
+
+Each command keeps its own execution history and diff baseline. Switching runs the newly selected command on the next interval (or immediately if you press SPACE).
+
 ## Keymaps
 
 | key       |                                            |
 |-----------|--------------------------------------------|
 | SPACE     | Run command now (skip wait until next interval) |
+| [ / ]     | Previous / next watched command (when multiple) |
 | m         | Toggle time machine mode                   |
 | s         | Toggle <ins>s</ins>uspend execution                   |
 | b         | Toggle ring terminal <ins>b</ins>ell                  |

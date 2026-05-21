@@ -16,6 +16,32 @@ use crate::{
     types::ExecutionId,
 };
 
+struct ExecutorState {
+    command: Vec<String>,
+    command_index: u32,
+    interval_ms: u64,
+}
+
+fn load_executor_state<S: Store>(
+    store: &S,
+    fallback: &RuntimeConfig,
+) -> Result<ExecutorState> {
+    if let Some(config) = store.get_runtime_config()? {
+        let command_index = config.active_command_index;
+        Ok(ExecutorState {
+            command: config.active_command_tokens().to_vec(),
+            command_index,
+            interval_ms: config.interval,
+        })
+    } else {
+        Ok(ExecutorState {
+            command: fallback.active_command().to_vec(),
+            command_index: fallback.active_command_index as u32,
+            interval_ms: fallback.interval.num_milliseconds() as u64,
+        })
+    }
+}
+
 pub async fn run_executor<S: Store>(
     actions: mpsc::UnboundedSender<Action>,
     mut store: S,
@@ -39,7 +65,8 @@ pub async fn run_executor<S: Store>(
             eprintln!("Failed to send start: {:?}", e);
         }
 
-        let result = exec(runtime_config.command.clone(), shell.clone()).await;
+        let state = load_executor_state(&store, &runtime_config)?;
+        let result = exec(state.command.clone(), shell.clone()).await;
         let (stdout, stderr, status) = match result {
             Ok(result) => result,
             Err(e) => (vec![], e.to_string().bytes().collect(), 1),
@@ -50,7 +77,7 @@ pub async fn run_executor<S: Store>(
         let utf8_stderr = String::from_utf8_lossy(&stderr).to_string();
         let end_time = chrono::Local::now();
 
-        let latest_id = store.get_latest_id()?;
+        let latest_id = store.get_latest_id_for_command(state.command_index)?;
         let diff = if let Some(latest_id) = latest_id {
             if let Some(record) = store.get_record(latest_id)? {
                 let old_stdout = String::from_utf8_lossy(&record.stdout).to_string();
@@ -79,6 +106,7 @@ pub async fn run_executor<S: Store>(
             exit_code,
             diff,
             previous_id: latest_id,
+            command_index: state.command_index,
         };
         store.add_record(record)?;
 
@@ -86,12 +114,7 @@ pub async fn run_executor<S: Store>(
             eprintln!("Failed to send result: {:?}", e);
         }
 
-        let interval = store
-            .get_runtime_config()?
-            .map(|config| config.interval)
-            .unwrap_or(runtime_config.interval.num_milliseconds() as u64);
-
-        wait_interval_or_wake(Duration::from_millis(interval), &mut wake_rx).await;
+        wait_interval_or_wake(Duration::from_millis(state.interval_ms), &mut wake_rx).await;
     }
 }
 
@@ -126,7 +149,8 @@ pub async fn run_executor_precise<S: Store>(
             eprintln!("Failed to send start: {:?}", e);
         }
 
-        let result = exec(runtime_config.command.clone(), shell.clone()).await;
+        let state = load_executor_state(&store, &runtime_config)?;
+        let result = exec(state.command.clone(), shell.clone()).await;
         let (stdout, stderr, status) = match result {
             Ok(result) => result,
             Err(e) => (vec![], e.to_string().bytes().collect(), 1),
@@ -137,7 +161,7 @@ pub async fn run_executor_precise<S: Store>(
         let utf8_stderr = String::from_utf8_lossy(&stderr).to_string();
         let end_time = chrono::Local::now();
 
-        let latest_id = store.get_latest_id()?;
+        let latest_id = store.get_latest_id_for_command(state.command_index)?;
         let diff = if let Some(latest_id) = latest_id {
             if let Some(record) = store.get_record(latest_id)? {
                 let old_stdout = String::from_utf8_lossy(&record.stdout).to_string();
@@ -166,6 +190,7 @@ pub async fn run_executor_precise<S: Store>(
             exit_code,
             diff,
             previous_id: latest_id,
+            command_index: state.command_index,
         };
         store.add_record(record)?;
 
@@ -175,12 +200,7 @@ pub async fn run_executor_precise<S: Store>(
 
         let elapased = chrono::Local::now().signed_duration_since(start_time);
 
-        let interval = store
-            .get_runtime_config()?
-            .map(|config| config.interval)
-            .unwrap_or(runtime_config.interval.num_milliseconds() as u64);
-
-        let interval = Duration::from_millis(interval);
+        let interval = Duration::from_millis(state.interval_ms);
 
         if let Ok(elapsed_std) = elapased.to_std() {
             if elapsed_std < interval {
@@ -258,10 +278,8 @@ mod test {
         let (action_tx, mut action_rx) = mpsc::unbounded_channel();
         let (wake_tx, wake_rx) = mpsc::channel(1);
         let store = MemoryStore::new();
-        let runtime_config = RuntimeConfig {
-            interval: Duration::milliseconds(30_000),
-            command: vec!["true".to_string()],
-        };
+        let runtime_config =
+            RuntimeConfig::from_single_command(Duration::milliseconds(30_000), vec!["true".to_string()]);
         let is_suspend = std::sync::Arc::new(tokio::sync::Mutex::new(false));
 
         let handle = tokio::spawn(run_executor(

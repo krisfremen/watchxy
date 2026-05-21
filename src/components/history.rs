@@ -70,9 +70,19 @@ impl History {
         Ok(())
     }
 
+    fn visible_items(&self) -> Vec<Rc<RefCell<HistoryItem>>> {
+        let active = self.runtime_config.active_command_index as u32;
+        self.items
+            .iter()
+            .filter(|i| i.borrow().command_index == active)
+            .cloned()
+            .collect()
+    }
+
     fn insert_history(&mut self, id: ExecutionId, start_time: DateTime<Local>) -> Result<()> {
         let item = Rc::new(RefCell::new(HistoryItem::new(
             id,
+            self.runtime_config.active_command_index as u32,
             start_time,
             self.runtime_config.interval,
             self.config.get_style("timemachine_selector"),
@@ -113,7 +123,8 @@ impl History {
     }
 
     fn select_latest(&mut self) -> Result<()> {
-        let index_to_select = self.items.iter().enumerate().find_map(|(i, item)| {
+        let visible = self.visible_items();
+        let index_to_select = visible.iter().enumerate().find_map(|(i, item)| {
             let item = item.borrow();
             if !item.is_running {
                 Some(i)
@@ -126,8 +137,9 @@ impl History {
     }
 
     fn select(&mut self, index: Option<usize>) -> Result<()> {
+        let visible = self.visible_items();
         if let Some(index) = index {
-            if let Some(history_item) = self.items.get(index) {
+            if let Some(history_item) = visible.get(index) {
                 let history_item = history_item.borrow();
                 if !history_item.is_running {
                     self.state.select(Some(index));
@@ -162,10 +174,14 @@ impl History {
             return Ok(());
         }
 
+        let visible_len = self.visible_items().len();
+        if visible_len == 0 {
+            return Ok(());
+        }
         let selected = self
             .state
             .selected
-            .map(|s| s.saturating_add(n).min(self.items.len() - 1));
+            .map(|s| s.saturating_add(n).min(visible_len - 1));
         if selected.is_none() {
             return Ok(());
         }
@@ -190,7 +206,8 @@ impl History {
             return Ok(());
         }
 
-        self.select(self.items.len().checked_sub(1))
+        let visible_len = self.visible_items().len();
+        self.select(visible_len.checked_sub(1))
     }
 
     fn go_to_current(&mut self) -> Result<()> {
@@ -243,6 +260,10 @@ impl Component for History {
             Action::GoToOldest => self.go_to_oldest()?,
             Action::GoToCurrent => self.go_to_current()?,
             Action::MouseEvent(e) => self.handle_mouse_events(e)?,
+            Action::SetActiveCommandIndex(index) => {
+                self.runtime_config.set_active_command_index(index);
+                self.select_latest()?;
+            }
             _ => {}
         }
 
@@ -258,7 +279,7 @@ impl Component for History {
             .border_style(self.config.get_style("border"))
             .title_style(self.config.get_style("title"));
         let items = self
-            .items
+            .visible_items()
             .iter()
             .map(|i| i.borrow().clone())
             .collect::<Vec<_>>();

@@ -88,6 +88,15 @@ pub struct Cli {
     pub command: Vec<String>,
 
     #[arg(
+        short = 'C',
+        long = "commands",
+        value_name = "COMMAND",
+        action = clap::ArgAction::Append,
+        help = "Additional commands to watch (repeat for each command; use with or without a positional COMMAND)"
+    )]
+    pub commands: Vec<String>,
+
+    #[arg(
         short = 'x',
         long = "exec",
         help = "Pass command to exec instead of \"sh -c\"",

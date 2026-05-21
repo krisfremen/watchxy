@@ -168,6 +168,16 @@ impl Component for Help {
                 Action::RunCommandNow.to_string(),
             ),
             (
+                "Next watched command      ",
+                Mode::All,
+                Action::NextCommand.to_string(),
+            ),
+            (
+                "Previous watched command  ",
+                Mode::All,
+                Action::PrevCommand.to_string(),
+            ),
+            (
                 "Toggle time machine mode  ",
                 Mode::All,
                 Action::SwitchTimemachineMode.to_string(),

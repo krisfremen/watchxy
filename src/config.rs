@@ -21,7 +21,62 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct RuntimeConfig {
     pub interval: Duration,
-    pub command: Vec<String>,
+    pub commands: Vec<Vec<String>>,
+    pub active_command_index: usize,
+}
+
+impl RuntimeConfig {
+    pub fn from_single_command(interval: Duration, command: Vec<String>) -> Self {
+        Self {
+            interval,
+            commands: vec![command],
+            active_command_index: 0,
+        }
+    }
+
+    pub fn from_commands(interval: Duration, commands: Vec<Vec<String>>) -> Self {
+        Self {
+            interval,
+            commands,
+            active_command_index: 0,
+        }
+    }
+
+    pub fn active_command(&self) -> &[String] {
+        &self.commands[self.active_command_index]
+    }
+
+    pub fn active_command_display(&self) -> String {
+        self.active_command().join(" ")
+    }
+
+    pub fn command_count(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn set_active_command_index(&mut self, index: usize) {
+        if index < self.commands.len() {
+            self.active_command_index = index;
+        }
+    }
+
+    pub fn next_command_index(&self) -> usize {
+        if self.commands.is_empty() {
+            return 0;
+        }
+        (self.active_command_index + 1) % self.commands.len()
+    }
+
+    pub fn prev_command_index(&self) -> usize {
+        if self.commands.is_empty() {
+            return 0;
+        }
+        if self.active_command_index == 0 {
+            self.commands.len() - 1
+        } else {
+            self.active_command_index - 1
+        }
+    }
 }
 
 const CONFIG: &str = include_str!("../.config/config.json5");

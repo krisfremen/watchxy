@@ -84,4 +84,7 @@ pub enum Action {
     ExitHelp,
     IncreaseInterval,
     DecreaseInterval,
+    NextCommand,
+    PrevCommand,
+    SetActiveCommandIndex(usize),
 }

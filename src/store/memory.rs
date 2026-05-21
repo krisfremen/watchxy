@@ -53,6 +53,18 @@ impl Store for MemoryStore {
         })
     }
 
+    fn get_latest_id_for_command(&self, command_index: u32) -> Result<Option<ExecutionId>> {
+        Ok(if let Ok(data) = self.data.read() {
+            data.records
+                .values()
+                .filter(|r| r.command_index == command_index)
+                .max_by_key(|r| r.id.0)
+                .map(|r| r.id)
+        } else {
+            None
+        })
+    }
+
     fn get_records(&self) -> Result<Vec<Record>> {
         Ok(if let Ok(data) = self.data.read() {
             data.records.values().cloned().collect()
