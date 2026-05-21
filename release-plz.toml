@@ -1,0 +1,7 @@
+[workspace]
+release_always = false
+git_tag_name = "v{{ version }}"
+semver_check = false
+
+[[package]]
+name = "watchxy"
