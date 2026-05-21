@@ -1,9 +1,13 @@
 [package]
 name = "watchxy"
 license = "MIT"
-version = "1.3.0"
+version = "0.0.1"
 edition = "2021"
 description = "A modern watch command"
+repository = "https://github.com/krisfremen/watchxy"
+readme = "README.md"
+keywords = ["cli", "watch", "terminal"]
+categories = ["command-line-utilities"]
 
 authors = ["Takumasa Sakao @sachaos <sakataku7@gmail.com>"]
 build = "build.rs"
