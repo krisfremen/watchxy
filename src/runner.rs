@@ -1,17 +1,16 @@
 use color_eyre::Result;
-use std::{ops::Sub, sync::Arc};
+use std::{sync::Arc, time::Duration};
 
 use dissimilar::{diff, Chunk};
 use tokio::{
-    process::Command,
-    sync::{mpsc, watch, Mutex},
+    sync::{mpsc, Mutex},
+    time::sleep,
 };
 
 use crate::{
     action::Action,
     bytes::normalize_stdout,
-    components::status,
-    config::{Config, RuntimeConfig},
+    config::RuntimeConfig,
     exec::exec,
     store::{Record, Store},
     types::ExecutionId,
@@ -23,13 +22,17 @@ pub async fn run_executor<S: Store>(
     runtime_config: RuntimeConfig,
     shell: Option<(String, Vec<String>)>,
     is_suspend: Arc<Mutex<bool>>,
+    mut wake_rx: mpsc::Receiver<()>,
 ) -> Result<()> {
     let latest_id = store.get_latest_id()?;
     let mut counter = latest_id.map(|id| id.0 + 1).unwrap_or(0);
     loop {
         counter += 1;
         if *is_suspend.lock().await {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tokio::select! {
+                _ = sleep(Duration::from_secs(1)) => {}
+                Some(()) = wake_rx.recv() => {}
+            }
             continue;
         }
 
@@ -91,7 +94,10 @@ pub async fn run_executor<S: Store>(
             .map(|config| config.interval)
             .unwrap_or(runtime_config.interval.num_milliseconds() as u64);
 
-        tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+        tokio::select! {
+            _ = sleep(Duration::from_millis(interval)) => {}
+            Some(()) = wake_rx.recv() => {}
+        }
     }
 }
 
@@ -101,6 +107,7 @@ pub async fn run_executor_precise<S: Store>(
     runtime_config: RuntimeConfig,
     shell: Option<(String, Vec<String>)>,
     is_suspend: Arc<Mutex<bool>>,
+    mut wake_rx: mpsc::Receiver<()>,
 ) -> Result<()> {
     let latest_id = store.get_latest_id()?;
     let mut counter = latest_id.map(|id| id.0 + 1).unwrap_or(0);
@@ -108,7 +115,10 @@ pub async fn run_executor_precise<S: Store>(
         counter += 1;
         let start_time = chrono::Local::now();
         if *is_suspend.lock().await {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tokio::select! {
+                _ = sleep(Duration::from_secs(1)) => {}
+                Some(()) = wake_rx.recv() => {}
+            }
             continue;
         }
 
@@ -171,12 +181,15 @@ pub async fn run_executor_precise<S: Store>(
             .map(|config| config.interval)
             .unwrap_or(runtime_config.interval.num_milliseconds() as u64);
 
-        let interval = std::time::Duration::from_millis(interval);
+        let interval = Duration::from_millis(interval);
 
         if let Ok(elapsed_std) = elapased.to_std() {
             if elapsed_std < interval {
                 let sleep_time = interval - elapsed_std;
-                tokio::time::sleep(sleep_time).await;
+                tokio::select! {
+                    _ = sleep(sleep_time) => {}
+                    Some(()) = wake_rx.recv() => {}
+                }
             }
         }
     }

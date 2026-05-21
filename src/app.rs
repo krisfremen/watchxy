@@ -53,6 +53,8 @@ pub struct App<S: Store> {
     store: S,
     read_only: bool,
     disable_mouse: bool,
+    wake_tx: mpsc::Sender<()>,
+    wake_rx: Option<mpsc::Receiver<()>>,
 }
 
 impl<S: Store> App<S> {
@@ -120,6 +122,7 @@ impl<S: Store> App<S> {
         };
 
         let timemachine_mode = false;
+        let (wake_tx, wake_rx) = mpsc::channel(1);
         let home = Home::new(
             config.clone(),
             runtime_config.clone(),
@@ -163,6 +166,8 @@ impl<S: Store> App<S> {
             diff_mode,
             shell,
             disable_mouse,
+            wake_tx,
+            wake_rx: Some(wake_rx),
         })
     }
 
@@ -193,22 +198,30 @@ impl<S: Store> App<S> {
                     tokio::time::sleep(Duration::seconds(1).to_std().unwrap()).await;
                 }
             })
-        } else if self.is_precise {
-            tokio::spawn(run_executor_precise(
-                action_tx.clone(),
-                self.store.clone(),
-                self.runtime_config.clone(),
-                self.shell.clone(),
-                self.is_suspend.clone(),
-            ))
         } else {
-            tokio::spawn(run_executor(
-                action_tx.clone(),
-                self.store.clone(),
-                self.runtime_config.clone(),
-                self.shell.clone(),
-                self.is_suspend.clone(),
-            ))
+            let wake_rx = self
+                .wake_rx
+                .take()
+                .expect("executor wake channel should be available once");
+            if self.is_precise {
+                tokio::spawn(run_executor_precise(
+                    action_tx.clone(),
+                    self.store.clone(),
+                    self.runtime_config.clone(),
+                    self.shell.clone(),
+                    self.is_suspend.clone(),
+                    wake_rx,
+                ))
+            } else {
+                tokio::spawn(run_executor(
+                    action_tx.clone(),
+                    self.store.clone(),
+                    self.runtime_config.clone(),
+                    self.shell.clone(),
+                    self.is_suspend.clone(),
+                    wake_rx,
+                ))
+            }
         };
 
         let mut tui = tui::Tui::new()?
@@ -505,6 +518,10 @@ impl<S: Store> App<S> {
                     Action::SetMode(mode) => {
                         self.set_mode(mode);
                     }
+                    Action::RunCommandNow if !self.read_only => {
+                        let _ = self.wake_tx.try_send(());
+                    }
+                    Action::RunCommandNow => {}
                     _ => {}
                 }
                 for component in self.components.iter_mut() {
