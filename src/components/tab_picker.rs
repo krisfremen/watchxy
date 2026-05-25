@@ -8,7 +8,7 @@ use super::{Component, Frame};
 use crate::{
     action::Action,
     config::{Config, RuntimeConfig},
-    tab_picker::{command_title, filter_command_indices},
+    tab_picker::{command_title, filter_command_indices, match_ranges, parse_filter_query},
 };
 
 pub struct TabPicker {
@@ -111,7 +111,7 @@ impl TabPicker {
     }
 
     fn title_spans(&self, title: &str, query: &str, selected: bool) -> Vec<Span<'static>> {
-        let query = query.trim();
+        let parsed = parse_filter_query(query);
         let highlight = self.config.get_style("search_highlight");
         let normal = if selected {
             self.config.get_style("timemachine_selector")
@@ -119,17 +119,18 @@ impl TabPicker {
             self.config.get_style("secondary_text")
         };
 
-        if query.is_empty() {
+        if parsed.needle.is_empty() {
             return vec![Span::styled(title.to_string(), normal)];
         }
 
-        let lower_title = title.to_lowercase();
-        let lower_query = query.to_lowercase();
+        let ranges = match_ranges(title, &parsed);
+        if ranges.is_empty() {
+            return vec![Span::styled(title.to_string(), normal)];
+        }
+
         let mut spans = Vec::new();
         let mut start = 0usize;
-        while let Some(rel) = lower_title[start..].find(&lower_query) {
-            let match_start = start + rel;
-            let match_end = match_start + query.len();
+        for (match_start, match_end) in ranges {
             if match_start > start {
                 spans.push(Span::styled(title[start..match_start].to_string(), normal));
             }
@@ -141,9 +142,6 @@ impl TabPicker {
         }
         if start < title.len() {
             spans.push(Span::styled(title[start..].to_string(), normal));
-        }
-        if spans.is_empty() {
-            spans.push(Span::styled(title.to_string(), normal));
         }
         spans
     }
