@@ -183,6 +183,11 @@ impl Component for Help {
                 Action::PrevCommand.to_string(),
             ),
             (
+                "Pick watched command      ",
+                Mode::All,
+                Action::EnterTabPickerMode.to_string(),
+            ),
+            (
                 "Toggle time machine mode  ",
                 Mode::All,
                 Action::SwitchTimemachineMode.to_string(),

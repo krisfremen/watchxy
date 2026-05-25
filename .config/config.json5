@@ -38,6 +38,7 @@
       "<b>": "SwitchBell",
       "<s>": "SwitchSuspend",
       "</>": "EnterSearchMode",
+      "<Shift-t>": "EnterTabPickerMode",
       "<t>": "SwitchNoTitle",
       "<?>": "ShowHelp",
       "<+>": "IncreaseInterval",
@@ -50,6 +51,15 @@
       "<Ctrl-c>": "Quit",
       "<enter>": "ExecuteSearch",
       "<esc>": "ExitSearchMode",
+    },
+    "TabPicker": {
+      "<enter>": "ConfirmTabPicker",
+      "<esc>": "ExitTabPickerMode",
+      "<up>": "TabPickerMoveUp",
+      "<down>": "TabPickerMoveDown",
+      "<k>": "TabPickerMoveUp",
+      "<j>": "TabPickerMoveDown",
+      "<Ctrl-c>": "Quit",
     },
     "Help": {
       "<j>": "HelpScrollDown",

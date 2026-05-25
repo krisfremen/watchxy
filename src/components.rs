@@ -19,6 +19,7 @@ pub mod home;
 pub mod interval;
 pub mod prompt;
 pub mod status;
+pub mod tab_picker;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 /// Implementers of this trait can be registered with the main application loop and will be able to receive events,
