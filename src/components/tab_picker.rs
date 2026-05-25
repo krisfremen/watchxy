@@ -88,11 +88,16 @@ impl TabPicker {
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::Backspace => {
-                self.input.handle_event(&crossterm::event::Event::Key(key_event));
+                self.input
+                    .handle_event(&crossterm::event::Event::Key(key_event));
                 self.clamp_selection();
                 self.set_query(self.input.value().to_string())?;
             }
-            KeyCode::Char('u') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+            KeyCode::Char('u')
+                if key_event
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
                 self.set_query(String::new())?;
             }
             _ => {
@@ -126,10 +131,7 @@ impl TabPicker {
             let match_start = start + rel;
             let match_end = match_start + query.len();
             if match_start > start {
-                spans.push(Span::styled(
-                    title[start..match_start].to_string(),
-                    normal,
-                ));
+                spans.push(Span::styled(title[start..match_start].to_string(), normal));
             }
             spans.push(Span::styled(
                 title[match_start..match_end].to_string(),
@@ -150,10 +152,7 @@ impl TabPicker {
         if !self.is_active {
             return Ok(());
         }
-        f.set_cursor(
-            area.x + self.input.visual_cursor() as u16 + 3,
-            area.y,
-        );
+        f.set_cursor(area.x + self.input.visual_cursor() as u16 + 3, area.y);
         let paragraph = Paragraph::new(format!("T> {}", self.input.value()));
         f.render_widget(paragraph, area);
         Ok(())
@@ -230,7 +229,10 @@ impl Component for TabPicker {
                     " "
                 };
                 let prefix = format!("{marker} ");
-                let mut spans = vec![Span::styled(prefix, self.config.get_style("secondary_text"))];
+                let mut spans = vec![Span::styled(
+                    prefix,
+                    self.config.get_style("secondary_text"),
+                )];
                 spans.extend(self.title_spans(&title, query, row == self.selection));
                 lines.push(Line::from(spans));
             }
