@@ -9,7 +9,8 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::{
     clock::Clock, command::Command, execution_result::ExecutionResult, help::Help,
-    history::History, interval::Interval, prompt::Prompt, status::Status, Component, Frame,
+    history::History, interval::Interval, prompt::Prompt, status::Status, tab_picker::TabPicker,
+    Component, Frame,
 };
 use crate::{
     action::{Action, DiffMode},
@@ -32,6 +33,7 @@ pub struct Home {
     execution_result_component: ExecutionResult,
     history_component: History,
     prompt_component: Prompt,
+    tab_picker_component: TabPicker,
     status_component: Status,
     help_component: Help,
     timemachine_mode: bool,
@@ -61,6 +63,7 @@ impl Home {
             execution_result_component: ExecutionResult::new(is_fold),
             history_component: History::new(runtime_config.clone()),
             prompt_component: Prompt::new(),
+            tab_picker_component: TabPicker::new(runtime_config.clone()),
             status_component: Status::new(is_fold, diff_mode, is_bell, read_only),
             help_component: Help::new(config),
             timemachine_mode,
@@ -88,6 +91,8 @@ impl Component for Home {
             .register_action_handler(tx.clone())?;
         self.history_component.register_action_handler(tx.clone())?;
         self.prompt_component.register_action_handler(tx.clone())?;
+        self.tab_picker_component
+            .register_action_handler(tx.clone())?;
         self.status_component.register_action_handler(tx.clone())?;
         self.help_component.register_action_handler(tx.clone())?;
 
@@ -108,6 +113,8 @@ impl Component for Home {
         self.history_component
             .register_config_handler(config.clone())?;
         self.prompt_component
+            .register_config_handler(config.clone())?;
+        self.tab_picker_component
             .register_config_handler(config.clone())?;
         self.status_component
             .register_config_handler(config.clone())?;
@@ -142,6 +149,7 @@ impl Component for Home {
         self.execution_result_component.update(action.clone())?;
         self.history_component.update(action.clone())?;
         self.prompt_component.update(action.clone())?;
+        self.tab_picker_component.update(action.clone())?;
         self.status_component.update(action.clone())?;
         self.help_component.update(action.clone())?;
 
@@ -190,7 +198,13 @@ impl Component for Home {
 
         let [prompt, status] =
             Layout::horizontal([Constraint::Fill(100), Constraint::Length(32)]).areas(footer);
-        self.prompt_component.draw(f, prompt)?;
+
+        if self.mode == Mode::TabPicker {
+            self.tab_picker_component.draw(f, area)?;
+            self.tab_picker_component.draw_prompt(f, prompt)?;
+        } else {
+            self.prompt_component.draw(f, prompt)?;
+        }
         self.status_component.draw(f, status)?;
 
         Ok(())

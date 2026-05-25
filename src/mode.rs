@@ -5,5 +5,6 @@ pub enum Mode {
     #[default]
     All,
     Search,
+    TabPicker,
     Help,
 }

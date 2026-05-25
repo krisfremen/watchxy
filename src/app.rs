@@ -307,6 +307,10 @@ impl<S: Store> App<S> {
                                     action_tx.send(Action::KeyEventForPrompt(key))?;
                                     continue;
                                 }
+                                if self.mode == Mode::TabPicker {
+                                    action_tx.send(Action::KeyEventForTabPicker(key))?;
+                                    continue;
+                                }
 
                                 // If the key was not handled as a single key action,
                                 // then consider it for multi-key combinations.
@@ -375,6 +379,23 @@ impl<S: Store> App<S> {
                     Action::SetActiveCommandIndex(index) => {
                         self.runtime_config.set_active_command_index(index);
                     }
+                    Action::ActivateCommandIndex(index)
+                        if self.runtime_config.command_count() > 1 =>
+                    {
+                        self.activate_command(index, &action_tx)?;
+                    }
+                    Action::EnterTabPickerMode if self.runtime_config.command_count() > 1 => {
+                        action_tx.send(Action::SetMode(Mode::TabPicker))?;
+                    }
+                    Action::ExitTabPickerMode => {
+                        action_tx.send(Action::SetMode(Mode::All))?;
+                    }
+                    Action::ActivateCommandIndex(_)
+                    | Action::ConfirmTabPicker
+                    | Action::SetTabPickerQuery(_)
+                    | Action::KeyEventForTabPicker(_)
+                    | Action::TabPickerMoveUp
+                    | Action::TabPickerMoveDown => {}
                     Action::NextCommand | Action::PrevCommand => {}
                     Action::Suspend => self.should_suspend = true,
                     Action::Resume => self.should_suspend = false,

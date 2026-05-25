@@ -163,6 +163,7 @@ With multiple commands: **SPACE** runs every command now; **r** runs only the ac
 | SPACE     | Run command(s) now (all commands when multiple) |
 | r         | Run active command now (when multiple)          |
 | [ / ]     | Previous / next watched command (when multiple) |
+| Shift-T   | Pick watched command by title (when multiple)   |
 | m         | Toggle time machine mode                        |
 | s         | Toggle suspend execution                        |
 | b         | Toggle ring terminal bell                       |

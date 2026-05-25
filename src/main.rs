@@ -15,6 +15,7 @@ pub mod mode;
 mod old_config;
 mod runner;
 mod search;
+mod tab_picker;
 mod store;
 mod termtext;
 pub mod tui;
