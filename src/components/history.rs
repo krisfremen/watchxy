@@ -304,10 +304,7 @@ impl Component for History {
 mod tests {
     use chrono::Local;
 
-    use crate::{
-        config::RuntimeConfig,
-        types::ExecutionId,
-    };
+    use crate::{config::RuntimeConfig, types::ExecutionId};
 
     use super::History;
 
@@ -317,9 +314,7 @@ mod tests {
             RuntimeConfig::from_single_command(chrono::Duration::seconds(2), vec!["true".into()]);
         let mut history = History::new(runtime_config);
         let id = ExecutionId(1);
-        history
-            .insert_history(id, Local::now(), 2)
-            .expect("insert");
+        history.insert_history(id, Local::now(), 2).expect("insert");
         assert_eq!(history.items[0].borrow().command_index, 2);
     }
 

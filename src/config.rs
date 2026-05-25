@@ -49,10 +49,7 @@ impl RuntimeConfig {
                 return cmd;
             }
         }
-        self.commands
-            .first()
-            .map(|c| c.as_slice())
-            .unwrap_or(EMPTY)
+        self.commands.first().map(|c| c.as_slice()).unwrap_or(EMPTY)
     }
 
     pub fn active_command_display(&self) -> String {

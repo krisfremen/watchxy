@@ -80,7 +80,10 @@ fn migrate_schema(conn: &Connection) -> Result<()> {
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     if !config_columns.iter().any(|c| c == "commands_json") {
-        conn.execute("ALTER TABLE runtime_config ADD COLUMN commands_json TEXT", ())?;
+        conn.execute(
+            "ALTER TABLE runtime_config ADD COLUMN commands_json TEXT",
+            (),
+        )?;
     }
     if !config_columns.iter().any(|c| c == "active_command_index") {
         conn.execute(

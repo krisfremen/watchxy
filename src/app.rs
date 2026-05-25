@@ -15,20 +15,18 @@ use tracing_subscriber::field::debug;
 
 use crate::{
     action::{self, Action, DiffMode},
-    command_state::COMMAND_PRODUCED_NO_OUTPUT,
     bytes::normalize_stdout,
     cli::Cli,
+    command_state::WakeRequest,
+    command_state::COMMAND_PRODUCED_NO_OUTPUT,
     components::{fps::FpsCounter, home::Home, Component},
     config::{Config, RuntimeConfig},
     diff::{diff_and_mark, diff_and_mark_delete},
     mode::Mode,
     old_config::OldConfig,
-    command_state::WakeRequest,
     runner::{run_executor, run_executor_precise},
     search::search_and_mark,
-    store::{
-        self, parse_command_tokens, RuntimeConfig as StoreRuntimeConfig, Store,
-    },
+    store::{self, parse_command_tokens, RuntimeConfig as StoreRuntimeConfig, Store},
     termtext, tui,
     types::ExecutionId,
 };
@@ -106,10 +104,7 @@ impl<S: Store> App<S> {
         self.runtime_config.set_active_command_index(index);
         self.store
             .set_runtime_config(store_runtime_from_app(&self.runtime_config))?;
-        if let Some(id) = self
-            .store
-            .get_latest_id_for_command(index as u32)?
-        {
+        if let Some(id) = self.store.get_latest_id_for_command(index as u32)? {
             if let Some(record) = self.store.get_record(id)? {
                 if record.command_index == index as u32 {
                     action_tx.send(Action::ShowExecution(id, id))?;
@@ -344,9 +339,8 @@ impl<S: Store> App<S> {
                         self.runtime_config.interval +=
                             Duration::milliseconds(self.config.general.interval_step_ms);
 
-                        self.store.set_runtime_config(store_runtime_from_app(
-                            &self.runtime_config,
-                        ))?;
+                        self.store
+                            .set_runtime_config(store_runtime_from_app(&self.runtime_config))?;
                     }
                     Action::DecreaseInterval => {
                         let min_interval =
@@ -357,9 +351,8 @@ impl<S: Store> App<S> {
 
                         self.runtime_config.interval = new_interval;
 
-                        self.store.set_runtime_config(store_runtime_from_app(
-                            &self.runtime_config,
-                        ))?;
+                        self.store
+                            .set_runtime_config(store_runtime_from_app(&self.runtime_config))?;
                     }
                     Action::NextCommand
                         if !self.read_only && self.runtime_config.command_count() > 1 =>
@@ -466,67 +459,70 @@ impl<S: Store> App<S> {
                                 || record.command_index
                                     == self.runtime_config.active_command_index as u32;
                             if show {
-                            action_tx.send(Action::SetClock(record.start_time))?;
-                            let mut result = if record.stdout.is_empty() && record.stderr.is_empty() {
-                                termtext::Converter::new(style)
-                                    .convert(COMMAND_PRODUCED_NO_OUTPUT.as_bytes())
-                            } else if record.stdout.is_empty() {
-                                let mut result = termtext::Converter::new(style)
-                                    .convert(&normalize_stdout(&record.stderr));
-                                result.mark_text(
-                                    0,
-                                    result.len(),
-                                    Style::new()
-                                        .fg_color(Some(Color::Ansi(anstyle::AnsiColor::Red))),
-                                );
-                                result
-                            } else {
-                                termtext::Converter::new(style)
-                                    .convert(&normalize_stdout(&record.stdout))
-                            };
-                            if !record.stdout.is_empty() {
-                                string = result.plain_text();
-                                if let Some(diff_mode) = self.diff_mode {
-                                    if let Some(previous_id) = record.previous_id {
-                                        let previous_record = self.store.get_record(previous_id)?;
-                                        if let Some(previous_record) = previous_record {
-                                            let previous_result = termtext::Converter::new(style)
-                                                .convert(&normalize_stdout(
-                                                    &previous_record.stdout,
-                                                ));
-                                            let previous_string = previous_result.plain_text();
-                                            if diff_mode == DiffMode::Add {
-                                                diff_and_mark(
-                                                    &string,
-                                                    &previous_string,
-                                                    &mut result,
-                                                );
-                                            } else if diff_mode == DiffMode::Delete {
-                                                result = previous_result;
-                                                diff_and_mark_delete(
-                                                    &string,
-                                                    &previous_string,
-                                                    &mut result,
-                                                );
-                                                string = previous_string; // Use previous string for search
+                                action_tx.send(Action::SetClock(record.start_time))?;
+                                let mut result = if record.stdout.is_empty()
+                                    && record.stderr.is_empty()
+                                {
+                                    termtext::Converter::new(style)
+                                        .convert(COMMAND_PRODUCED_NO_OUTPUT.as_bytes())
+                                } else if record.stdout.is_empty() {
+                                    let mut result = termtext::Converter::new(style)
+                                        .convert(&normalize_stdout(&record.stderr));
+                                    result.mark_text(
+                                        0,
+                                        result.len(),
+                                        Style::new()
+                                            .fg_color(Some(Color::Ansi(anstyle::AnsiColor::Red))),
+                                    );
+                                    result
+                                } else {
+                                    termtext::Converter::new(style)
+                                        .convert(&normalize_stdout(&record.stdout))
+                                };
+                                if !record.stdout.is_empty() {
+                                    string = result.plain_text();
+                                    if let Some(diff_mode) = self.diff_mode {
+                                        if let Some(previous_id) = record.previous_id {
+                                            let previous_record =
+                                                self.store.get_record(previous_id)?;
+                                            if let Some(previous_record) = previous_record {
+                                                let previous_result =
+                                                    termtext::Converter::new(style).convert(
+                                                        &normalize_stdout(&previous_record.stdout),
+                                                    );
+                                                let previous_string = previous_result.plain_text();
+                                                if diff_mode == DiffMode::Add {
+                                                    diff_and_mark(
+                                                        &string,
+                                                        &previous_string,
+                                                        &mut result,
+                                                    );
+                                                } else if diff_mode == DiffMode::Delete {
+                                                    result = previous_result;
+                                                    diff_and_mark_delete(
+                                                        &string,
+                                                        &previous_string,
+                                                        &mut result,
+                                                    );
+                                                    string = previous_string; // Use previous string for search
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            if let Some(ref search_query) = self.search_query {
-                                search_and_mark(
-                                    &string,
-                                    &mut result,
-                                    search_query,
-                                    termtext::convert_to_anstyle(
-                                        self.config.get_style("search_highlight"),
-                                    ),
-                                );
-                            }
-                            action_tx.send(Action::SetResult(Some(result)))?;
-                            self.showing_execution_id = Some(id);
+                                if let Some(ref search_query) = self.search_query {
+                                    search_and_mark(
+                                        &string,
+                                        &mut result,
+                                        search_query,
+                                        termtext::convert_to_anstyle(
+                                            self.config.get_style("search_highlight"),
+                                        ),
+                                    );
+                                }
+                                action_tx.send(Action::SetResult(Some(result)))?;
+                                self.showing_execution_id = Some(id);
                             }
                         } else {
                             log::warn!("ShowExecution: record {id:?} not found in store");

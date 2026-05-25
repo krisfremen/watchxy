@@ -61,8 +61,7 @@ impl Component for Command {
             .borders(Borders::ALL)
             .border_style(self.config.get_style("border"))
             .title_style(self.config.get_style("title"));
-        let paragraph =
-            Paragraph::new(self.runtime_config.active_command_display()).block(block);
+        let paragraph = Paragraph::new(self.runtime_config.active_command_display()).block(block);
 
         f.render_widget(paragraph, area);
         Ok(())

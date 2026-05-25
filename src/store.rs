@@ -60,7 +60,11 @@ impl RuntimeConfig {
 }
 
 pub fn parse_command_tokens(command: &str) -> Vec<String> {
-    command.split(' ').filter(|s| !s.is_empty()).map(str::to_string).collect()
+    command
+        .split(' ')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 pub fn commands_to_json(commands: &[Vec<String>]) -> Result<String> {

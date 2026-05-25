@@ -52,7 +52,10 @@ fn load_executor_state<S: Store>(store: &S, fallback: &RuntimeConfig) -> Result<
     })
 }
 
-fn load_all_commands<S: Store>(store: &S, fallback: &RuntimeConfig) -> Result<Vec<(u32, Vec<String>)>> {
+fn load_all_commands<S: Store>(
+    store: &S,
+    fallback: &RuntimeConfig,
+) -> Result<Vec<(u32, Vec<String>)>> {
     let config = store_config_or_fallback(store, fallback)?;
     Ok(resolved_all_commands(&config))
 }
@@ -73,11 +76,7 @@ async fn execute_command<S: Store>(
     }
 
     let (stdout, stderr, status) = if !is_command_runnable(&command) {
-        (
-            Vec::new(),
-            NO_COMMAND_CONFIGURED.as_bytes().to_vec(),
-            1,
-        )
+        (Vec::new(), NO_COMMAND_CONFIGURED.as_bytes().to_vec(), 1)
     } else {
         match exec(command, shell).await {
             Ok(result) => result,
@@ -190,7 +189,8 @@ pub async fn run_executor<S: Store>(
         }
 
         let interval_ms = load_executor_state(&store, &runtime_config)?.interval_ms;
-        pending_wake = wait_interval_or_wake(Duration::from_millis(interval_ms), &mut wake_rx).await;
+        pending_wake =
+            wait_interval_or_wake(Duration::from_millis(interval_ms), &mut wake_rx).await;
     }
 }
 
@@ -345,8 +345,10 @@ mod test {
         let (action_tx, mut action_rx) = mpsc::unbounded_channel();
         let (wake_tx, wake_rx) = mpsc::channel(1);
         let store = MemoryStore::new();
-        let runtime_config =
-            RuntimeConfig::from_single_command(Duration::milliseconds(30_000), vec!["true".to_string()]);
+        let runtime_config = RuntimeConfig::from_single_command(
+            Duration::milliseconds(30_000),
+            vec!["true".to_string()],
+        );
         let is_suspend = std::sync::Arc::new(tokio::sync::Mutex::new(false));
 
         let handle = tokio::spawn(run_executor(
@@ -416,16 +418,9 @@ mod test {
         let config = store.get_runtime_config().unwrap().unwrap();
         let tokens = resolved_active_command_tokens(&config);
         let mut counter = 0u32;
-        execute_command_for_test(
-            &action_tx,
-            &mut store,
-            &mut counter,
-            0,
-            tokens,
-            None,
-        )
-        .await
-        .unwrap();
+        execute_command_for_test(&action_tx, &mut store, &mut counter, 0, tokens, None)
+            .await
+            .unwrap();
 
         assert!(
             drain_until(
@@ -436,10 +431,7 @@ mod test {
             .await
         );
 
-        let record = store
-            .get_record(ExecutionId(1))
-            .unwrap()
-            .expect("record");
+        let record = store.get_record(ExecutionId(1)).unwrap().expect("record");
         let stdout = String::from_utf8_lossy(&record.stdout);
         assert!(
             stdout.contains("watchxy-test-marker"),
@@ -474,10 +466,7 @@ mod test {
             .await
         );
 
-        let record = store
-            .get_record(ExecutionId(1))
-            .unwrap()
-            .expect("record");
+        let record = store.get_record(ExecutionId(1)).unwrap().expect("record");
         let stderr = String::from_utf8_lossy(&record.stderr);
         assert!(stderr.contains("no command configured"));
     }
@@ -499,8 +488,7 @@ mod test {
             })
             .unwrap();
 
-        let runtime_config =
-            RuntimeConfig::from_commands(Duration::milliseconds(60_000), vec![]);
+        let runtime_config = RuntimeConfig::from_commands(Duration::milliseconds(60_000), vec![]);
         let is_suspend = std::sync::Arc::new(tokio::sync::Mutex::new(false));
 
         let handle = tokio::spawn(run_executor(
@@ -548,8 +536,7 @@ mod test {
             })
             .unwrap();
 
-        let runtime_config =
-            RuntimeConfig::from_commands(Duration::milliseconds(60_000), vec![]);
+        let runtime_config = RuntimeConfig::from_commands(Duration::milliseconds(60_000), vec![]);
         let is_suspend = std::sync::Arc::new(tokio::sync::Mutex::new(false));
 
         let handle = tokio::spawn(run_executor(

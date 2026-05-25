@@ -17,10 +17,7 @@ pub fn is_command_runnable(command: &[String]) -> bool {
 
 /// Active command tokens, falling back to the legacy `command` string when `commands` is empty.
 pub fn resolved_active_command_tokens(config: &StoreRuntimeConfig) -> Vec<String> {
-    if let Some(tokens) = config
-        .commands
-        .get(config.active_command_index as usize)
-    {
+    if let Some(tokens) = config.commands.get(config.active_command_index as usize) {
         if !tokens.is_empty() {
             return tokens.clone();
         }
@@ -82,7 +79,11 @@ mod tests {
     use super::*;
     use crate::store::RuntimeConfig as StoreRuntimeConfig;
 
-    fn config_with_commands(commands: Vec<Vec<String>>, active: u32, legacy: &str) -> StoreRuntimeConfig {
+    fn config_with_commands(
+        commands: Vec<Vec<String>>,
+        active: u32,
+        legacy: &str,
+    ) -> StoreRuntimeConfig {
         StoreRuntimeConfig {
             interval: 2000,
             command: legacy.to_string(),
@@ -103,7 +104,10 @@ mod tests {
     #[test]
     fn resolved_active_uses_indexed_commands_when_present() {
         let config = config_with_commands(
-            vec![vec!["git".into(), "status".into()], vec!["df".into(), "-h".into()]],
+            vec![
+                vec!["git".into(), "status".into()],
+                vec!["df".into(), "-h".into()],
+            ],
             1,
             "git status",
         );
@@ -113,11 +117,7 @@ mod tests {
     #[test]
     fn resolved_all_returns_every_non_empty_command() {
         let config = config_with_commands(
-            vec![
-                vec!["true".into()],
-                vec![],
-                vec!["false".into()],
-            ],
+            vec![vec!["true".into()], vec![], vec!["false".into()]],
             0,
             "true",
         );
@@ -140,10 +140,7 @@ mod tests {
             merge_wake(Some(WakeRequest::All), WakeRequest::Active),
             WakeRequest::All
         );
-        assert_eq!(
-            merge_wake(None, WakeRequest::Active),
-            WakeRequest::Active
-        );
+        assert_eq!(merge_wake(None, WakeRequest::Active), WakeRequest::Active);
     }
 
     #[test]
