@@ -44,10 +44,16 @@ async fn tokio_main() -> Result<()> {
     let args = Cli::parse();
     let interval = Duration::from(args.interval);
 
-    if args.load.is_none() && args.command.is_empty() && args.commands.is_empty() {
+    if args.load.is_none()
+        && args.command.is_empty()
+        && args.commands.is_empty()
+        && args.commands_file.is_none()
+    {
         return Err(eyre!("No command provided"));
     }
-    if args.load.is_some() && (!args.command.is_empty() || !args.commands.is_empty()) {
+    if args.load.is_some()
+        && (!args.command.is_empty() || !args.commands.is_empty() || args.commands_file.is_some())
+    {
         return Err(eyre!("Can not use --load with command"));
     }
 

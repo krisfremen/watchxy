@@ -26,7 +26,10 @@ use crate::{
     old_config::OldConfig,
     runner::{run_executor, run_executor_precise},
     search::search_and_mark,
-    store::{self, parse_command_tokens, RuntimeConfig as StoreRuntimeConfig, Store},
+    store::{
+        self, load_commands_from_file, parse_command_tokens, RuntimeConfig as StoreRuntimeConfig,
+        Store,
+    },
     termtext, tui,
     types::ExecutionId,
 };
@@ -59,7 +62,7 @@ pub struct App<S: Store> {
     wake_rx: Option<mpsc::Receiver<WakeRequest>>,
 }
 
-fn build_runtime_config_from_cli(cli: &Cli) -> RuntimeConfig {
+fn build_runtime_config_from_cli(cli: &Cli) -> Result<RuntimeConfig> {
     let mut commands: Vec<Vec<String>> = Vec::new();
     if !cli.command.is_empty() {
         commands.push(cli.command.clone());
@@ -67,7 +70,10 @@ fn build_runtime_config_from_cli(cli: &Cli) -> RuntimeConfig {
     for cmd in &cli.commands {
         commands.push(parse_command_tokens(cmd));
     }
-    RuntimeConfig::from_commands(cli.interval, commands)
+    if let Some(path) = &cli.commands_file {
+        commands.extend(load_commands_from_file(path)?);
+    }
+    Ok(RuntimeConfig::from_commands(cli.interval, commands))
 }
 
 fn store_runtime_from_app(runtime_config: &RuntimeConfig) -> StoreRuntimeConfig {
@@ -120,7 +126,7 @@ impl<S: Store> App<S> {
             let store_runtime_config = store.get_runtime_config()?.unwrap_or_default();
             runtime_config_from_store(store_runtime_config)
         } else {
-            let runtime_config = build_runtime_config_from_cli(&cli);
+            let runtime_config = build_runtime_config_from_cli(&cli)?;
             store.set_runtime_config(store_runtime_from_app(&runtime_config))?;
             runtime_config
         };

@@ -97,6 +97,14 @@ pub struct Cli {
     pub commands: Vec<String>,
 
     #[arg(
+        short = 'F',
+        long = "commands-file",
+        value_name = "FILE",
+        help = "File with one command per line (same as repeating -C; # starts a comment, blank lines are ignored)"
+    )]
+    pub commands_file: Option<PathBuf>,
+
+    #[arg(
         short = 'x',
         long = "exec",
         help = "Pass command to exec instead of \"sh -c\"",
