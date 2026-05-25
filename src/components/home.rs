@@ -200,7 +200,7 @@ impl Component for Home {
             Layout::horizontal([Constraint::Fill(100), Constraint::Length(32)]).areas(footer);
 
         if self.mode == Mode::TabPicker {
-            self.tab_picker_component.draw(f, area)?;
+            self.tab_picker_component.draw(f, middle)?;
             self.tab_picker_component.draw_prompt(f, prompt)?;
         } else {
             self.prompt_component.draw(f, prompt)?;

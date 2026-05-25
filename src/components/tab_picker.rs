@@ -201,15 +201,16 @@ impl Component for TabPicker {
 
         let filtered = self.filtered_indices();
         let query = self.input.value();
-        let list_height = filtered.len().clamp(1, 8) as u16 + 2;
-        let popup_height = list_height.min(area.height.saturating_sub(2));
-        let popup_width = area.width.saturating_sub(4).max(20);
+
+        // Borders add 2 rows; show every match, capped only by the content pane height.
+        const BORDER_ROWS: u16 = 2;
+        let max_rows = area.height.saturating_sub(BORDER_ROWS) as usize;
+        let visible_rows = filtered.len().max(1).min(max_rows);
+        let popup_height = visible_rows as u16 + BORDER_ROWS;
+        let popup_width = area.width.saturating_sub(8).max(24);
         let popup_area = Rect {
             x: area.x + (area.width.saturating_sub(popup_width)) / 2,
-            y: area
-                .y
-                .saturating_add(area.height)
-                .saturating_sub(popup_height + 2),
+            y: area.y + (area.height.saturating_sub(popup_height)) / 2,
             width: popup_width,
             height: popup_height,
         };
