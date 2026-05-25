@@ -201,7 +201,7 @@ impl Component for TabPicker {
 
         let filtered = self.filtered_indices();
         let query = self.input.value();
-        let list_height = filtered.len().min(8).max(1) as u16 + 2;
+        let list_height = filtered.len().clamp(1, 8) as u16 + 2;
         let popup_height = list_height.min(area.height.saturating_sub(2));
         let popup_width = area.width.saturating_sub(4).max(20);
         let popup_area = Rect {
