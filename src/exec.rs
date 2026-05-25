@@ -8,7 +8,7 @@ pub async fn exec(
     let (command, args) = prepare_command(command, shell);
     let mut command = Command::new(command);
 
-    let (width, height) = crossterm::terminal::size()?;
+    let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
     command.env("COLUMNS", width.to_string());
     command.env("LINES", height.to_string());
     command.args(args);
@@ -44,5 +44,28 @@ fn is_pwsh(shell: &Option<(String, Vec<String>)>) -> bool {
         shell == "pwsh"
     } else {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exec;
+
+    #[tokio::test]
+    async fn exec_runs_via_shell_without_tty() {
+        let (stdout, stderr, status) = exec(
+            vec!["echo".into(), "watchxy-test-marker".into()],
+            Some(("sh".into(), vec![])),
+        )
+        .await
+        .expect("exec should succeed without a TTY (uses fallback terminal size)");
+
+        assert_eq!(status, 0, "stderr: {}", String::from_utf8_lossy(&stderr));
+        assert!(
+            String::from_utf8_lossy(&stdout).contains("watchxy-test-marker"),
+            "stdout: {:?}, stderr: {:?}",
+            String::from_utf8_lossy(&stdout),
+            String::from_utf8_lossy(&stderr)
+        );
     }
 }

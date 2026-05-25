@@ -40,16 +40,28 @@ impl Component for Command {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        if let Action::SetActiveCommandIndex(index) = action {
+            self.runtime_config.set_active_command_index(index);
+        }
         Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        let title = if self.runtime_config.command_count() > 1 {
+            format!(
+                "Command {}/{}",
+                self.runtime_config.active_command_index + 1,
+                self.runtime_config.command_count()
+            )
+        } else {
+            "Command".to_string()
+        };
         let block = Block::default()
-            .title("Command")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(self.config.get_style("border"))
             .title_style(self.config.get_style("title"));
-        let paragraph = Paragraph::new(self.runtime_config.command.join(" ")).block(block);
+        let paragraph = Paragraph::new(self.runtime_config.active_command_display()).block(block);
 
         f.render_widget(paragraph, area);
         Ok(())

@@ -7,6 +7,7 @@ use crate::{config::Config, types::ExecutionId};
 #[derive(Debug, Clone)]
 pub struct HistoryItem {
     pub id: ExecutionId,
+    pub command_index: u32,
     pub diff: Option<(u32, u32)>,
     pub start_time: DateTime<Local>,
     pub exit_code: Option<i32>,
@@ -21,6 +22,7 @@ pub struct HistoryItem {
 impl HistoryItem {
     pub fn new(
         id: ExecutionId,
+        command_index: u32,
         start_time: DateTime<Local>,
         duration: Duration,
         selector_style: Style,
@@ -28,6 +30,7 @@ impl HistoryItem {
     ) -> Self {
         Self {
             id,
+            command_index,
             start_time,
             diff: None,
             exit_code: None,

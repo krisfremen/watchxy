@@ -6,6 +6,7 @@
       "<Ctrl-c>": "Quit", // Yet another way to quit
       "<Ctrl-z>": "Suspend", // Suspend the application
       "<space>": "RunCommandNow",
+      "<r>": "RunActiveCommandNow",
       "<m>": "SwitchTimemachineMode",
       "<Shift-j>": "GoToPast",
       "<Shift-k>": "GoToFuture",
@@ -41,6 +42,8 @@
       "<?>": "ShowHelp",
       "<+>": "IncreaseInterval",
       "<->": "DecreaseInterval",
+      "<]>": "NextCommand",
+      "<[>": "PrevCommand",
     },
     "Search": {
       "<Ctrl-d>": "Quit", // Another way to quit

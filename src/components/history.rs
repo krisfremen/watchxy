@@ -70,9 +70,24 @@ impl History {
         Ok(())
     }
 
-    fn insert_history(&mut self, id: ExecutionId, start_time: DateTime<Local>) -> Result<()> {
+    fn visible_items(&self) -> Vec<Rc<RefCell<HistoryItem>>> {
+        let active = self.runtime_config.active_command_index as u32;
+        self.items
+            .iter()
+            .filter(|i| i.borrow().command_index == active)
+            .cloned()
+            .collect()
+    }
+
+    fn insert_history(
+        &mut self,
+        id: ExecutionId,
+        start_time: DateTime<Local>,
+        command_index: u32,
+    ) -> Result<()> {
         let item = Rc::new(RefCell::new(HistoryItem::new(
             id,
+            command_index,
             start_time,
             self.runtime_config.interval,
             self.config.get_style("timemachine_selector"),
@@ -113,7 +128,8 @@ impl History {
     }
 
     fn select_latest(&mut self) -> Result<()> {
-        let index_to_select = self.items.iter().enumerate().find_map(|(i, item)| {
+        let visible = self.visible_items();
+        let index_to_select = visible.iter().enumerate().find_map(|(i, item)| {
             let item = item.borrow();
             if !item.is_running {
                 Some(i)
@@ -126,8 +142,9 @@ impl History {
     }
 
     fn select(&mut self, index: Option<usize>) -> Result<()> {
+        let visible = self.visible_items();
         if let Some(index) = index {
-            if let Some(history_item) = self.items.get(index) {
+            if let Some(history_item) = visible.get(index) {
                 let history_item = history_item.borrow();
                 if !history_item.is_running {
                     self.state.select(Some(index));
@@ -162,10 +179,14 @@ impl History {
             return Ok(());
         }
 
+        let visible_len = self.visible_items().len();
+        if visible_len == 0 {
+            return Ok(());
+        }
         let selected = self
             .state
             .selected
-            .map(|s| s.saturating_add(n).min(self.items.len() - 1));
+            .map(|s| s.saturating_add(n).min(visible_len - 1));
         if selected.is_none() {
             return Ok(());
         }
@@ -190,7 +211,8 @@ impl History {
             return Ok(());
         }
 
-        self.select(self.items.len().checked_sub(1))
+        let visible_len = self.visible_items().len();
+        self.select(visible_len.checked_sub(1))
     }
 
     fn go_to_current(&mut self) -> Result<()> {
@@ -228,7 +250,9 @@ impl Component for History {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::InsertHistory(id, start_time) => self.insert_history(id, start_time)?,
+            Action::InsertHistory(id, start_time, command_index) => {
+                self.insert_history(id, start_time, command_index)?
+            }
             Action::UpdateHistoryResult(id, diff, exit_code) => {
                 self.update_history_result(id, diff, exit_code)?
             }
@@ -243,6 +267,12 @@ impl Component for History {
             Action::GoToOldest => self.go_to_oldest()?,
             Action::GoToCurrent => self.go_to_current()?,
             Action::MouseEvent(e) => self.handle_mouse_events(e)?,
+            Action::SetActiveCommandIndex(index) => {
+                self.runtime_config.set_active_command_index(index);
+                if self.timemachine_mode {
+                    self.select_latest()?;
+                }
+            }
             _ => {}
         }
 
@@ -258,7 +288,7 @@ impl Component for History {
             .border_style(self.config.get_style("border"))
             .title_style(self.config.get_style("title"));
         let items = self
-            .items
+            .visible_items()
             .iter()
             .map(|i| i.borrow().clone())
             .collect::<Vec<_>>();
@@ -267,5 +297,42 @@ impl Component for History {
         f.render_stateful_widget(list, area, &mut self.state);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Local;
+
+    use crate::{config::RuntimeConfig, types::ExecutionId};
+
+    use super::History;
+
+    #[test]
+    fn insert_history_tags_passed_command_index() {
+        let runtime_config =
+            RuntimeConfig::from_single_command(chrono::Duration::seconds(2), vec!["true".into()]);
+        let mut history = History::new(runtime_config);
+        let id = ExecutionId(1);
+        history.insert_history(id, Local::now(), 2).expect("insert");
+        assert_eq!(history.items[0].borrow().command_index, 2);
+    }
+
+    #[test]
+    fn visible_items_only_shows_active_command() {
+        let runtime_config = RuntimeConfig::from_commands(
+            chrono::Duration::seconds(2),
+            vec![vec!["a".into()], vec!["b".into()]],
+        );
+        let mut history = History::new(runtime_config);
+        history
+            .insert_history(ExecutionId(1), Local::now(), 0)
+            .expect("insert");
+        history
+            .insert_history(ExecutionId(2), Local::now(), 1)
+            .expect("insert");
+        history.runtime_config.set_active_command_index(1);
+        assert_eq!(history.visible_items().len(), 1);
+        assert_eq!(history.visible_items()[0].borrow().command_index, 1);
     }
 }
