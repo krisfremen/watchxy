@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4](https://github.com/krisfremen/watchxy/compare/v0.0.3...v0.0.4) - 2026-05-25
+
+### Added
+
+- *(cli)* add --commands-file to load watched commands ([#8](https://github.com/krisfremen/watchxy/pull/8))
+
 ## [0.0.3](https://github.com/krisfremen/watchxy/compare/v0.0.2...v0.0.3) - 2026-05-25
 
 ### Fixed
