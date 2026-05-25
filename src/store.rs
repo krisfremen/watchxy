@@ -67,7 +67,9 @@ pub fn parse_command_tokens(command: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn load_commands_from_file(path: &std::path::Path) -> color_eyre::eyre::Result<Vec<Vec<String>>> {
+pub fn load_commands_from_file(
+    path: &std::path::Path,
+) -> color_eyre::eyre::Result<Vec<Vec<String>>> {
     use color_eyre::eyre::{bail, eyre};
 
     let content = std::fs::read_to_string(path)
@@ -102,18 +104,10 @@ mod tests {
     fn load_commands_from_file_parses_lines_like_dash_c() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("cmds");
-        std::fs::write(
-            &path,
-            "git status\n\n# comment\ndf -h\n  uptime  \n",
-        )
-        .unwrap();
+        std::fs::write(&path, "git status\n\n# comment\ndf -h\n  uptime  \n").unwrap();
         assert_eq!(
             load_commands_from_file(&path).unwrap(),
-            vec![
-                vec!["git", "status"],
-                vec!["df", "-h"],
-                vec!["uptime"],
-            ]
+            vec![vec!["git", "status"], vec!["df", "-h"], vec!["uptime"],]
         );
     }
 
