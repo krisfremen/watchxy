@@ -417,8 +417,15 @@ mod test {
 
         let config = store.get_runtime_config().unwrap().unwrap();
         let tokens = resolved_active_command_tokens(&config);
+        assert_eq!(
+            tokens,
+            vec!["echo".to_string(), "watchxy-test-marker".to_string()],
+            "legacy command string should resolve to shell tokens"
+        );
+
+        let shell = Some(("sh".to_string(), Vec::new()));
         let mut counter = 0u32;
-        execute_command_for_test(&action_tx, &mut store, &mut counter, 0, tokens, None)
+        execute_command_for_test(&action_tx, &mut store, &mut counter, 0, tokens, shell)
             .await
             .unwrap();
 
@@ -432,10 +439,18 @@ mod test {
         );
 
         let record = store.get_record(ExecutionId(1)).unwrap().expect("record");
+        assert_eq!(record.command_index, 0);
+        assert_eq!(
+            record.exit_code,
+            0,
+            "stderr: {:?}",
+            String::from_utf8_lossy(&record.stderr)
+        );
         let stdout = String::from_utf8_lossy(&record.stdout);
         assert!(
             stdout.contains("watchxy-test-marker"),
-            "stdout was: {stdout:?}"
+            "stdout was: {stdout:?}, stderr: {:?}",
+            String::from_utf8_lossy(&record.stderr)
         );
     }
 
