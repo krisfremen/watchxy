@@ -16,22 +16,22 @@ Modern `watch` command.
 
 ## Features
 
-* Basic features of original watch command.
-    * Execute command periodically, and display the result.
-    * color output.
-    * diff highlight.
-* Time machine mode. 😎
-    * Rewind like video.
-    * Go to the past, and back to the future.
-* Look back history.
-    * Save and load history.
-* See output in pager.
-* Vim like keymaps.
-* Search text.
-* Suspend and restart execution.
-* Support shell alias (behavior depends on shell; you may need login shells or full profile initialization for aliases defined only in interactive configs).
-* Customize keymappings.
-* Customize color.
+- Basic features of original watch command.
+  - Execute command periodically, and display the result.
+  - color output.
+  - diff highlight.
+- Time machine mode. 😎
+  - Rewind like video.
+  - Go to the past, and back to the future.
+- Look back history.
+  - Save and load history.
+- See output in pager.
+- Vim like keymaps.
+- Search text.
+- Suspend and restart execution.
+- Support shell alias (behavior depends on shell; you may need login shells or full profile initialization for aliases defined only in interactive configs).
+- Customize keymappings.
+- Customize color.
 
 ## Install
 
@@ -69,54 +69,80 @@ wget -O watchxy.tar.gz https://github.com/OWNER/REPO/releases/download/v1.3.0/wa
 
 Community formulas use their own names; search for **watchxy** once a maintainer publishes one.
 
-## Command-line options
+## Usage
 
 ```shell
 watchxy [OPTIONS] [COMMAND]...
 ```
 
-Provide at least one of: a positional `COMMAND`, `-C` / `--commands`, or `-F` / `--commands-file`. `--load` restores a saved session and cannot be combined with a command.
+You must provide at least one command source:
 
-| Option | Description |
-|--------|-------------|
-| `-n`, `--interval` *DURATION* | Wait between updates (default: `2s`). Accepts [humantime](https://docs.rs/humantime) durations; a bare number is treated as seconds. Minimum: `100ms`. |
-| `-d`, `--differences` | Highlight changes between updates. |
-| `-D`, `--deletion-differences` | Highlight deletions between updates (mutually exclusive with `--differences`). |
-| `-p`, `--precise` | Run on precise intervals (compensates for command runtime). |
-| `-t`, `--no-title` | Hide the header. |
-| `-w`, `--unfold`, `--no-wrap` | Disable line wrapping. |
-| `--shell` *SHELL* | Shell for `-c` execution (default: `sh` on Unix, `cmd` on Windows). Conflicts with `--exec`. |
-| `--shell-options` *OPTS…* | Extra arguments passed to the shell. |
-| `-s`, `--skip-empty-diffs` | Omit history entries when the diff is empty. |
-| `-b`, `--bell` | Ring the terminal bell when output changes. |
-| `-C`, `--commands` *COMMAND* | Additional watched command (repeatable). Same string form as the positional command. |
-| `-F`, `--commands-file` *FILE* | File with one command per line (same as repeating `-C`). Blank lines and `#` comments are ignored. |
-| `-x`, `--exec` | Run the command with `exec` instead of `sh -c` (or the configured shell). |
-| `--debug` | Enable debug logging. |
-| `--save` *FILE* | Write history to this SQLite backup path. |
-| `--disable_auto_save` | Do not persist history to disk. |
-| `--disable_mouse` | Ignore mouse events. |
-| `--load`, `--lookback` *FILE* | Open a backup file (no command or interval flags). |
+- a positional `COMMAND` (one or more tokens; use `--` before flags if the command starts with `-`), and/or
+- `-C` / `--commands` (repeat for each extra command), and/or
+- `-F` / `--commands-file` (one command per line).
 
-Examples:
+`--load` / `--lookback` opens a saved session instead of running a new command. It cannot be combined with a command, interval, shell, exec, bell, precise, or save options.
+
+## Command-line arguments and options
+
+### Arguments
+
+| Argument | Description |
+| -------- | ----------- |
+| `COMMAND`… | Command to watch. Passed to the shell as `sh -c` (or your `--shell`) unless `--exec` is set. Hyphen values are allowed; put `--` before the command if it starts with `-`. |
+
+### Options
+
+| Short | Long | Value | Default | Description |
+| ----- | ---- | ----- | ------- | ----------- |
+| `-n` | `--interval` | *DURATION* | `2s` | Wait between updates. Uses [humantime](https://docs.rs/humantime) (e.g. `500ms`, `1m30s`); a bare number is seconds. Minimum: `100ms`. |
+| `-d` | `--differences` | — | off | Highlight changes between updates. |
+| `-D` | `--deletion-differences` | — | off | Highlight deletions between updates. Cannot be used with `--differences`. |
+| `-p` | `--precise` | — | off | Run on precise intervals (compensates for command runtime). Not available with `--load`. |
+| `-t` | `--no-title` | — | off | Hide the header. |
+| `-w` | `--unfold` | — | off | Disable line wrapping. Alias: `--no-wrap`. |
+| | `--shell` | *SHELL* | `sh` (Unix), `cmd` (Windows) | Shell used for `-c` execution. Cannot be used with `--exec` or `--load`. |
+| `-s` | `--skip-empty-diffs` | — | off | Skip history entries when the diff is empty. |
+| | `--shell-options` | *OPTS…* | — | Extra arguments passed to the shell. Not available with `--load`. |
+| `-b` | `--bell` | — | off | Ring the terminal bell when output changes. Not available with `--load`. |
+| `-C` | `--commands` | *COMMAND* | — | Additional command to watch (repeatable). Same string form as the positional command. |
+| `-F` | `--commands-file` | *FILE* | — | File with one command per line (same as repeating `-C`). Blank lines and `#` comments are ignored. |
+| `-x` | `--exec` | — | off | Run the command with `exec` instead of `sh -c` (or the configured shell). Cannot be used with `--shell` or `--load`. |
+| | `--debug` | — | off | Enable debug logging. |
+| | `--save` | *FILE* | auto temp file | Write history to this SQLite backup path. Cannot be used with `--disable_auto_save` or `--load`. |
+| | `--disable_auto_save` | — | off | Do not persist history to disk. Cannot be used with `--save` or `--load`. |
+| | `--disable_mouse` | — | off | Ignore mouse events. |
+| | `--load` | *FILE* | — | Open a backup file and browse saved history. Alias: `--lookback`. Cannot be used with commands, `--save`, `--disable_auto_save`, `--shell`, `--shell-options`, `--exec`, `--bell`, `--precise`, or `--interval`. |
+| `-h` | `--help` | — | — | Print help. |
+| `-V` | `--version` | — | — | Print version, authors, config directory, and data directory. |
+
+### Examples
 
 ```shell
+# Basic: run every second with diff highlighting
 watchxy -n 1s -d date
+
+# Humantime interval, precise timing, bell on change
 watchxy --interval 500ms --precise --bell ./script.sh
+
+# Exec a binary directly (no shell -c)
 watchxy -x -- ./my-binary --flag
+
+# Save session to a file
 watchxy --save ./session.sqlite -n 5 git log -1
+
+# Restore a saved session (no command required)
 watchxy --lookback ./session.sqlite
+
+# Multiple commands
+watchxy -n 2s -C "git status" -C "df -h"
+watchxy -n 2s git status -C "df -h"
+watchxy -n 2s -F commands.txt
 ```
 
 ## Multiple commands
 
 Run more than one command and switch between them with `[` and `]`:
-
-```shell
-watchxy -n 2s -C "git status" -C "df -h"
-watchxy -n 2s git status -C "df -h"
-watchxy -n 2s -F commands.txt
-```
 
 `commands.txt` is one command per line (same as repeating `-C`). Blank lines and lines starting with `#` are ignored:
 
@@ -132,32 +158,32 @@ With multiple commands: **SPACE** runs every command now; **r** runs only the ac
 
 ## Keymaps
 
-| key       |                                            |
-|-----------|--------------------------------------------|
+| key       |                                                 |
+| --------- | ----------------------------------------------- |
 | SPACE     | Run command(s) now (all commands when multiple) |
-| r         | Run active command now (when multiple)        |
+| r         | Run active command now (when multiple)          |
 | [ / ]     | Previous / next watched command (when multiple) |
-| m         | Toggle time machine mode                   |
-| s         | Toggle <ins>s</ins>uspend execution                   |
-| b         | Toggle ring terminal <ins>b</ins>ell                  |
-| d         | Toggle <ins>d</ins>iff                                |
-| t         | Toggle header/<ins>t</ins>itle display                      |
-| ?         | Toggle help view                           |
-| /         | Search text                                |
-| j         | Pager: next line                           |
-| k         | Pager: previous line                       |
-| h         | Pager: move left                           |
-| l         | Pager: move right                          |
-| Control-F | Pager: page down                           |
-| Control-B | Pager: page up                             |
-| g         | Pager: go to top of page                   |
-| Shift-G   | Pager: go to bottom of page                |
-| Shift-J   | (Time machine mode) Go to the past         |
-| Shift-K   | (Time machine mode) Back to the future     |
-| Shift-F   | (Time machine mode) Go to more past        |
-| Shift-B   | (Time machine mode) Back to more future    |
-| Shift-O   | (Time machine mode) Go to oldest position  |
-| Shift-N   | (Time machine mode) Go to current position |
+| m         | Toggle time machine mode                        |
+| s         | Toggle suspend execution                        |
+| b         | Toggle ring terminal bell                       |
+| d         | Toggle diff                                     |
+| t         | Toggle header/title display                     |
+| ?         | Toggle help view                                |
+| /         | Search text                                     |
+| j         | Pager: next line                                |
+| k         | Pager: previous line                            |
+| h         | Pager: move left                                |
+| l         | Pager: move right                               |
+| Control-F | Pager: page down                                |
+| Control-B | Pager: page up                                  |
+| g         | Pager: go to top of page                        |
+| Shift-G   | Pager: go to bottom of page                     |
+| Shift-J   | (Time machine mode) Go to the past              |
+| Shift-K   | (Time machine mode) Back to the future          |
+| Shift-F   | (Time machine mode) Go to more past             |
+| Shift-B   | (Time machine mode) Back to more future         |
+| Shift-O   | (Time machine mode) Go to oldest position       |
+| Shift-N   | (Time machine mode) Go to current position      |
 
 ## Configuration
 
