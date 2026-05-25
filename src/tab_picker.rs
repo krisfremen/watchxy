@@ -72,6 +72,27 @@ pub fn match_ranges(title: &str, parsed: &FilterQuery) -> Vec<(usize, usize)> {
     ranges
 }
 
+/// Keep `selection` visible in a viewport of `visible_rows` within `total` items.
+pub fn adjust_scroll_offset(
+    selection: usize,
+    scroll_offset: usize,
+    visible_rows: usize,
+    total: usize,
+) -> usize {
+    if total == 0 || visible_rows == 0 {
+        return 0;
+    }
+    let visible_rows = visible_rows.min(total);
+    let max_offset = total.saturating_sub(visible_rows);
+    let mut offset = scroll_offset.min(max_offset);
+    if selection < offset {
+        offset = selection;
+    } else if selection >= offset + visible_rows {
+        offset = selection + 1 - visible_rows;
+    }
+    offset
+}
+
 /// Indices into `runtime_config.commands` whose titles match the query.
 pub fn filter_command_indices(runtime_config: &RuntimeConfig, query: &str) -> Vec<usize> {
     let parsed = parse_filter_query(query);
@@ -241,5 +262,16 @@ mod tests {
         let config = sample_config();
         assert_eq!(filter_command_indices(&config, "-h"), vec![1]);
         assert_eq!(filter_command_indices(&config, "time"), vec![2]);
+    }
+
+    #[test]
+    fn adjust_scroll_offset_keeps_selection_in_view() {
+        assert_eq!(adjust_scroll_offset(0, 0, 10, 300), 0);
+        assert_eq!(adjust_scroll_offset(9, 0, 10, 300), 0);
+        assert_eq!(adjust_scroll_offset(10, 0, 10, 300), 1);
+        assert_eq!(adjust_scroll_offset(50, 0, 10, 300), 41);
+        assert_eq!(adjust_scroll_offset(299, 0, 10, 300), 290);
+        assert_eq!(adjust_scroll_offset(100, 95, 10, 300), 95);
+        assert_eq!(adjust_scroll_offset(90, 95, 10, 300), 90);
     }
 }

@@ -8,7 +8,10 @@ use super::{Component, Frame};
 use crate::{
     action::Action,
     config::{Config, RuntimeConfig},
-    tab_picker::{command_title, filter_command_indices, match_ranges, parse_filter_query},
+    tab_picker::{
+        adjust_scroll_offset, command_title, filter_command_indices, match_ranges,
+        parse_filter_query,
+    },
 };
 
 pub struct TabPicker {
@@ -18,6 +21,8 @@ pub struct TabPicker {
     input: Input,
     is_active: bool,
     selection: usize,
+    scroll_offset: usize,
+    viewport_rows: usize,
 }
 
 impl TabPicker {
@@ -29,7 +34,19 @@ impl TabPicker {
             input: Input::default(),
             is_active: false,
             selection: 0,
+            scroll_offset: 0,
+            viewport_rows: 1,
         }
+    }
+
+    fn ensure_selection_visible(&mut self) {
+        let total = self.filtered_indices().len();
+        self.scroll_offset = adjust_scroll_offset(
+            self.selection,
+            self.scroll_offset,
+            self.viewport_rows,
+            total,
+        );
     }
 
     fn filtered_indices(&self) -> Vec<usize> {
@@ -57,12 +74,15 @@ impl TabPicker {
         let next = self.selection as isize + delta;
         let wrapped = (next.rem_euclid(count as isize)) as usize;
         self.selection = wrapped;
+        self.ensure_selection_visible();
     }
 
     fn set_query(&mut self, query: String) -> Result<()> {
         self.input = Input::from(query);
         self.selection = 0;
+        self.scroll_offset = 0;
         self.clamp_selection();
+        self.ensure_selection_visible();
         if let Some(tx) = &self.command_tx {
             tx.send(Action::SetTabPickerQuery(self.input.value().to_string()))?;
         }
@@ -72,14 +92,24 @@ impl TabPicker {
     fn enter_mode(&mut self) -> Result<()> {
         self.is_active = true;
         self.input = Input::default();
-        self.selection = 0;
-        self.set_query(String::new())
+        self.scroll_offset = 0;
+        if let Some(tx) = &self.command_tx {
+            tx.send(Action::SetTabPickerQuery(String::new()))?;
+        }
+        let filtered = self.filtered_indices();
+        self.selection = filtered
+            .iter()
+            .position(|&i| i == self.runtime_config.active_command_index)
+            .unwrap_or(0);
+        self.ensure_selection_visible();
+        Ok(())
     }
 
     fn exit_mode(&mut self) -> Result<()> {
         self.is_active = false;
         self.input = Input::default();
         self.selection = 0;
+        self.scroll_offset = 0;
         self.set_query(String::new())
     }
 
@@ -198,12 +228,15 @@ impl Component for TabPicker {
         }
 
         let filtered = self.filtered_indices();
-        let query = self.input.value();
+        let query = self.input.value().to_string();
 
         // Borders add 2 rows; show every match, capped only by the content pane height.
         const BORDER_ROWS: u16 = 2;
         let max_rows = area.height.saturating_sub(BORDER_ROWS) as usize;
         let visible_rows = filtered.len().max(1).min(max_rows);
+        self.viewport_rows = visible_rows;
+        self.ensure_selection_visible();
+
         let popup_height = visible_rows as u16 + BORDER_ROWS;
         let popup_width = area.width.saturating_sub(8).max(24);
         let popup_area = Rect {
@@ -220,7 +253,9 @@ impl Component for TabPicker {
                 self.config.get_style("secondary_text"),
             )));
         } else {
-            for (row, &command_index) in filtered.iter().enumerate() {
+            let end = (self.scroll_offset + visible_rows).min(filtered.len());
+            for (row, &command_index) in filtered[self.scroll_offset..end].iter().enumerate() {
+                let list_index = self.scroll_offset + row;
                 let title = command_title(&self.runtime_config.commands[command_index]);
                 let marker = if command_index == self.runtime_config.active_command_index {
                     "●"
@@ -232,13 +267,23 @@ impl Component for TabPicker {
                     prefix,
                     self.config.get_style("secondary_text"),
                 )];
-                spans.extend(self.title_spans(&title, query, row == self.selection));
+                spans.extend(self.title_spans(&title, &query, list_index == self.selection));
                 lines.push(Line::from(spans));
             }
         }
 
+        let title = if filtered.len() > visible_rows {
+            format!(
+                " Switch command {}-{} of {} ",
+                self.scroll_offset + 1,
+                (self.scroll_offset + visible_rows).min(filtered.len()),
+                filtered.len()
+            )
+        } else {
+            " Switch command ".to_string()
+        };
         let block = Block::default()
-            .title(" Switch command ")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(self.config.get_style("border"));
         f.render_widget(Clear, popup_area);
