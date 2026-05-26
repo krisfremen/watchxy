@@ -47,6 +47,7 @@ pub struct App<S: Store> {
     pub timemachine_mode: bool,
     pub search_query: Option<String>,
     is_precise: bool,
+    manual_refresh: bool,
     diff_mode: Option<DiffMode>,
     is_suspend: Arc<Mutex<bool>>,
     is_bell: bool,
@@ -202,6 +203,7 @@ impl<S: Store> App<S> {
             timemachine_mode,
             search_query: None,
             is_precise: cli.is_precise,
+            manual_refresh: cli.manual_refresh,
             is_bell: cli.is_bell,
             is_fold: !cli.is_unfold,
             is_no_title: cli.is_no_title,
@@ -255,6 +257,7 @@ impl<S: Store> App<S> {
                     self.runtime_config.clone(),
                     self.shell.clone(),
                     self.is_suspend.clone(),
+                    self.manual_refresh,
                     wake_rx,
                 ))
             } else {
@@ -264,6 +267,7 @@ impl<S: Store> App<S> {
                     self.runtime_config.clone(),
                     self.shell.clone(),
                     self.is_suspend.clone(),
+                    self.manual_refresh,
                     wake_rx,
                 ))
             }

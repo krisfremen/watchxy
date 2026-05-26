@@ -146,6 +146,7 @@ pub async fn run_executor<S: Store>(
     runtime_config: RuntimeConfig,
     shell: Option<(String, Vec<String>)>,
     is_suspend: Arc<Mutex<bool>>,
+    manual_refresh: bool,
     mut wake_rx: mpsc::Receiver<WakeRequest>,
 ) -> Result<()> {
     let latest_id = store.get_latest_id()?;
@@ -155,6 +156,14 @@ pub async fn run_executor<S: Store>(
     loop {
         if *is_suspend.lock().await {
             pending_wake = wait_interval_or_wake(Duration::from_secs(1), &mut wake_rx).await;
+            continue;
+        }
+
+        if manual_refresh && first_run {
+            first_run = false;
+            let interval_ms = load_executor_state(&store, &runtime_config)?.interval_ms;
+            pending_wake =
+                wait_interval_or_wake(Duration::from_millis(interval_ms), &mut wake_rx).await;
             continue;
         }
 
@@ -212,6 +221,7 @@ pub async fn run_executor_precise<S: Store>(
     runtime_config: RuntimeConfig,
     shell: Option<(String, Vec<String>)>,
     is_suspend: Arc<Mutex<bool>>,
+    manual_refresh: bool,
     mut wake_rx: mpsc::Receiver<WakeRequest>,
 ) -> Result<()> {
     let latest_id = store.get_latest_id()?;
@@ -222,6 +232,14 @@ pub async fn run_executor_precise<S: Store>(
         let cycle_start = chrono::Local::now();
         if *is_suspend.lock().await {
             pending_wake = wait_interval_or_wake(Duration::from_secs(1), &mut wake_rx).await;
+            continue;
+        }
+
+        if manual_refresh && first_run {
+            first_run = false;
+            let interval_ms = load_executor_state(&store, &runtime_config)?.interval_ms;
+            pending_wake =
+                wait_interval_or_wake(Duration::from_millis(interval_ms), &mut wake_rx).await;
             continue;
         }
 
@@ -357,6 +375,7 @@ mod test {
             runtime_config,
             None,
             is_suspend,
+            false,
             wake_rx,
         ));
 
@@ -512,6 +531,7 @@ mod test {
             runtime_config,
             None,
             is_suspend,
+            false,
             wake_rx,
         ));
 
@@ -560,6 +580,7 @@ mod test {
             runtime_config,
             None,
             is_suspend,
+            false,
             wake_rx,
         ));
 
@@ -595,6 +616,68 @@ mod test {
             sleep(StdDuration::from_millis(10)).await;
         }
         assert_eq!(wake_finishes, 2, "Run All should finish both commands");
+
+        handle.abort();
+        let _ = handle.await;
+    }
+
+    #[tokio::test]
+    async fn manual_refresh_skips_startup_until_wake() {
+        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
+        let (wake_tx, wake_rx) = mpsc::channel(8);
+        let mut store = MemoryStore::new();
+        store
+            .set_runtime_config(StoreRuntimeConfig {
+                interval: 60_000,
+                command: "echo one".to_string(),
+                commands: vec![
+                    vec!["echo".into(), "one".into()],
+                    vec!["echo".into(), "two".into()],
+                ],
+                active_command_index: 0,
+            })
+            .unwrap();
+
+        let runtime_config = RuntimeConfig::from_commands(Duration::milliseconds(60_000), vec![]);
+        let is_suspend = std::sync::Arc::new(tokio::sync::Mutex::new(false));
+
+        let handle = tokio::spawn(run_executor(
+            action_tx,
+            store,
+            runtime_config,
+            None,
+            is_suspend,
+            true,
+            wake_rx,
+        ));
+
+        sleep(StdDuration::from_millis(200)).await;
+        let mut startup_finishes = 0;
+        while let Ok(action) = action_rx.try_recv() {
+            if matches!(action, Action::FinishExecution(..)) {
+                startup_finishes += 1;
+            }
+        }
+        assert_eq!(
+            startup_finishes, 0,
+            "manual refresh should not run commands on startup"
+        );
+
+        wake_tx.send(WakeRequest::All).await.unwrap();
+        let mut wake_finishes = 0;
+        let deadline = Instant::now() + StdDuration::from_secs(5);
+        while Instant::now() < deadline && wake_finishes < 2 {
+            while let Ok(action) = action_rx.try_recv() {
+                if matches!(action, Action::FinishExecution(..)) {
+                    wake_finishes += 1;
+                }
+            }
+            sleep(StdDuration::from_millis(10)).await;
+        }
+        assert_eq!(
+            wake_finishes, 2,
+            "manual refresh should run all commands after wake"
+        );
 
         handle.abort();
         let _ = handle.await;

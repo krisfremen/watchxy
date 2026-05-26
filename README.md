@@ -152,7 +152,9 @@ df -h
 # optional comment
 ```
 
-Each command keeps its own execution history and diff baseline. On startup, every configured command runs once before the interval loop begins. Switching shows the last output for that command when available.
+Each command keeps its own execution history and diff baseline. On startup, every configured command runs once before the interval loop begins (unless `--manual-refresh` is set). Switching shows the last output for that command when available.
+
+Use `--manual-refresh` to skip that initial run and wait for the refresh interval or **SPACE** / **r** before executing anything.
 
 With multiple commands: **SPACE** runs every command now; **r** runs only the active command. With a single command, **SPACE** runs it now.
 

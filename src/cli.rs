@@ -49,6 +49,12 @@ pub struct Cli {
     )]
     pub is_precise: bool,
 
+    #[arg(
+        long = "manual-refresh",
+        help = "Do not run commands on startup; wait for the interval or a manual refresh (SPACE / r)"
+    )]
+    pub manual_refresh: bool,
+
     #[arg(short = 't', long = "no-title", help = "Turn off header")]
     pub is_no_title: bool,
 
